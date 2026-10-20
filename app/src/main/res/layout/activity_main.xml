@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- 1. Area untuk menampilkan Video -->
+    <!-- Area Video Player -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
@@ -15,30 +15,47 @@
         app:layout_constraintBottom_toTopOf="@+id/btnPickVideo"
         app:use_controller="true" />
 
-    <!-- 2. Tombol untuk memilih video dari galeri -->
     <Button
         android:id="@+id/btnPickVideo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Pilih Video"
         android:layout_marginBottom="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/tvContrastValue"
+        app:layout_constraintBottom_toTopOf="@+id/menuScrollView"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- 3. Teks dan Slider Kontras (yang sudah ada) -->
+    <!-- DERETAN MENU SCROLL (Eksposur, Kontras, dll) -->
+    <HorizontalScrollView
+        android:id="@+id/menuScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:paddingVertical="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/tvContrastValue">
+        
+        <LinearLayout
+            android:id="@+id/menuContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp" />
+    </HorizontalScrollView>
+
+    <!-- Teks Nilai Slider -->
     <TextView
         android:id="@+id/tvContrastValue"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Contrast: 0.0"
+        android:text="Kontras: 0"
         android:textColor="#FFFFFF"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:layout_marginBottom="8dp"
         app:layout_constraintBottom_toTopOf="@+id/seekBarContrast"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <!-- Slider -->
     <SeekBar
         android:id="@+id/seekBarContrast"
         android:layout_width="match_parent"
