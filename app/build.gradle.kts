@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -15,6 +15,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
@@ -26,32 +29,60 @@ android {
             )
         }
     }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+    
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    
+    buildFeatures {
+        viewBinding = true // Memudahkan pemanggilan UI tanpa findViewById
+    }
+
+    // =========================================================================
+    // PENTING: Konfigurasi Packaging untuk Library FFmpeg & OpenGL
+    // Tanpa ini, build di GitHub Actions sering gagal karena bentrok file lisensi
+    // =========================================================================
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE"
+            excludes += "META-INF/LICENSE.txt"
+            excludes += "META-INF/NOTICE"
+            excludes += "META-INF/NOTICE.txt"
+            excludes += "META-INF/INDEX.LIST"
+        }
     }
 }
 
 dependencies {
-    // --- Bawaan Android Studio ---
+    // --- Bawaan Android & UI ---
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    
-    // --- TAMBAHKAN LIBRARY VIDEO EDITOR DI SINI ---
-    
-    // 1. Library untuk Filter Real-time (Kontras, Eksposur)
-    implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
 
-    // 2. Library untuk Export/Encode Video (FFmpeg)
-    // Catatan: Jika library ini error saat sync, kita bisa ganti dengan Media3 Transformer dari Google nanti.
-    implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0-2")
-    
-    // 3. (Opsional) ExoPlayer untuk memutar video di layar
+    // --- Media3 ExoPlayer (Untuk Pratinjau Video di Layar) ---
+    // Diambil dari dokumentasi resmi AndroidX Media3
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
+
+    // --- GPUImage (Untuk Efek Real-time Kontras/Eksposur) ---
+    // Library ini menggunakan OpenGL untuk memproses warna video secara langsung
+    implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
+
+    // --- FFmpeg (Untuk Render / Export Video) ---
+    // Menggunakan versi 'min-gpl' agar ukuran APK tidak terlalu besar saat testing.
+    // Jika nanti butuh codec lebih banyak (misal H.265), ganti 'min' menjadi 'full'.
+    implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0-2")
+
+    // --- Testing (Bawaan) ---
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
