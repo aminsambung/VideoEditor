@@ -15,9 +15,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
     }
 
     buildTypes {
@@ -40,13 +37,10 @@ android {
     }
     
     buildFeatures {
-        viewBinding = true // Memudahkan pemanggilan UI tanpa findViewById
+        viewBinding = true 
     }
 
-    // =========================================================================
-    // PENTING: Konfigurasi Packaging untuk Library FFmpeg & OpenGL
-    // Tanpa ini, build di GitHub Actions sering gagal karena bentrok file lisensi
-    // =========================================================================
+    // Konfigurasi wajib agar library FFmpeg & Media3 tidak bentrok saat di-build
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -68,18 +62,15 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     // --- Media3 ExoPlayer (Untuk Pratinjau Video di Layar) ---
-    // Diambil dari dokumentasi resmi AndroidX Media3
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
 
     // --- GPUImage (Untuk Efek Real-time Kontras/Eksposur) ---
-    // Library ini menggunakan OpenGL untuk memproses warna video secara langsung
     implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
 
     // --- FFmpeg (Untuk Render / Export Video) ---
-    // Menggunakan versi 'min-gpl' agar ukuran APK tidak terlalu besar saat testing.
-    // Jika nanti butuh codec lebih banyak (misal H.265), ganti 'min' menjadi 'full'.
-    implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0-2")
+    // MENGGUNAKAN FORK YANG MASIH AKTIF (karena com.arthenica sudah dihapus)
+    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-min-gpl:6.0.3")
 
     // --- Testing (Bawaan) ---
     testImplementation("junit:junit:4.13.2")
