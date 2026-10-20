@@ -4,49 +4,32 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#000000"
+    android:padding="16dp">
 
-    <!-- Area Preview Video -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+    <TextView
+        android:id="@+id/tvContrastValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Contrast: 0.0"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        app:layout_constraintBottom_toTopOf="@+id/seekBarContrast"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/bottomPanel" />
+        app:layout_constraintVertical_chainStyle="packed" />
 
-    <!-- Panel Bawah untuk Kontrol -->
-    <LinearLayout
-        android:id="@+id/bottomPanel"
+    <SeekBar
+        android:id="@+id/seekBarContrast"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="#1A1A1A"
-        android:padding="16dp"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <TextView
-            android:id="@+id/tvContrastValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Contrast: 0"
-            android:textColor="#FFFFFF"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="8dp"/>
-
-        <SeekBar
-            android:id="@+id/seekBarContrast"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:max="100"
-            android:progress="50" /> <!-- Default di tengah -->
-
-        <Button
-            android:id="@+id/btnExport"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Export Video"
-            android:layout_marginTop="16dp"/>
-
-    </LinearLayout>
+        android:layout_marginTop="16dp"
+        android:max="100"
+        android:progress="50"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvContrastValue" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
