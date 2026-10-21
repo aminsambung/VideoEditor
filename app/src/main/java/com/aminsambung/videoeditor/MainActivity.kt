@@ -14,6 +14,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
@@ -24,7 +25,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import java.io.InputStream
 
@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var exoPlayer: ExoPlayer? = null
     private var videoRenderer: VideoRenderer? = null
     private var glSurfaceView: GLSurfaceView? = null
+    private var btnPlayPause: ImageButton? = null
     private val handler = Handler(Looper.getMainLooper())
     
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -62,33 +63,39 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Inisialisasi OpenGL (Di dalam onCreate, tapi aman karena surface_type sudah benar)
-        try {
-            glSurfaceView = findViewById(R.id.glSurfaceView)
-            glSurfaceView?.setEGLContextClientVersion(2)
-            videoRenderer = VideoRenderer(this)
-            glSurfaceView?.setRenderer(videoRenderer)
-            glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        } catch (e: Exception) {
-            Toast.makeText(this, "OpenGL Error: ${e.message}", Toast.LENGTH_LONG).show()
-            e.printStackTrace()
+        // 1. Inisialisasi OpenGL
+        glSurfaceView = findViewById(R.id.glSurfaceView)
+        glSurfaceView?.setEGLContextClientVersion(2)
+        videoRenderer = VideoRenderer(this)
+        glSurfaceView?.setRenderer(videoRenderer)
+        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+
+        // 2. Inisialisasi ExoPlayer (TANPA PlayerView)
+        exoPlayer = ExoPlayer.Builder(this).build()
+        
+        // 3. Tombol Play/Pause Manual
+        btnPlayPause = findViewById(R.id.btnPlayPause)
+        btnPlayPause?.setOnClickListener {
+            if (exoPlayer?.isPlaying == true) {
+                exoPlayer?.pause()
+                btnPlayPause?.setImageResource(android.R.drawable.ic_media_play)
+            } else {
+                exoPlayer?.play()
+                btnPlayPause?.setImageResource(android.R.drawable.ic_media_pause)
+            }
         }
 
-        // 2. Inisialisasi ExoPlayer
-        exoPlayer = ExoPlayer.Builder(this).build()
-        val playerView = findViewById<PlayerView>(R.id.playerView)
-        playerView.player = exoPlayer
-        playerView.setShutterBackgroundColor(Color.TRANSPARENT)
-        playerView.controllerShowTimeoutMs = 3000
-        
-        playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-            if (visibility == View.VISIBLE) {
-                handler.removeCallbacksAndMessages(null)
-                handler.postDelayed({ playerView.hideController() }, 3000)
+        // Listener untuk menampilkan tombol saat video siap
+        exoPlayer?.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    btnPlayPause?.visibility = View.VISIBLE
+                    btnPlayPause?.setImageResource(android.R.drawable.ic_media_pause)
+                }
             }
         })
 
-        // 3. Setup Tombol
+        // 4. Setup Tombol Navigasi Bawah
         findViewById<Button>(R.id.btnVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
@@ -108,13 +115,13 @@ class MainActivity : AppCompatActivity() {
     private fun loadPhoto(uri: Uri) {
         exoPlayer?.pause()
         exoPlayer?.clearMediaItems()
+        btnPlayPause?.visibility = View.GONE
         try {
             val inputStream: InputStream? = contentResolver.openInputStream(uri)
             val bitmap = BitmapFactory.decodeStream(inputStream)
             videoRenderer?.setImageBitmap(bitmap)
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(this, "Gagal memuat foto", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -227,10 +234,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playVideo(uri: Uri) {
+        // KUNCI UTAMA ANDROID 15:
+        // Jangan gunakan PlayerView. Kirim sinyal video langsung ke Renderer.
         videoRenderer?.setVideoMode() 
-        
-        // PENTING UNTUK ANDROID 15:
-        // Pasang videoSurface untuk Renderer (OpenGL)
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
         
         val mediaItem = MediaItem.fromUri(uri)
@@ -245,7 +251,6 @@ class MainActivity : AppCompatActivity() {
 
         exoPlayer?.prepare()
         exoPlayer?.play()
-        handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
     }
 
     override fun onStop() {
