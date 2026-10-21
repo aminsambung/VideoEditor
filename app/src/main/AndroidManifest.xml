@@ -17,15 +17,7 @@
         android:theme="@style/Theme.VideoEditor"
         tools:targetApi="31">
         
-        <!-- ... sisa kode activity ... -->
-
-    <application
-        android:allowBackup="true"
-        android:label="@string/app_name"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.VideoEditor"
-        tools:targetApi="31">
-        
+        <!-- Activity Utama -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
