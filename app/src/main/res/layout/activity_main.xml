@@ -6,15 +6,30 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Area Video Player -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
+    <!-- Area Video Player (Menggunakan FrameLayout agar bisa menumpuk 2 View) -->
+    <FrameLayout
+        android:id="@+id/videoContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/btnPickVideo"
-        app:use_controller="true" />
+        app:layout_constraintBottom_toTopOf="@+id/btnPickVideo">
 
+        <!-- 1. GLSurfaceView (Untuk Merender Video dengan Efek GPU) -->
+        <!-- View ini akan ditambahkan secara otomatis oleh kode Kotlin -->
+        
+        <!-- 2. PlayerView (Untuk Menampilkan Kontrol: Play, Pause, Next, Prev) -->
+        <!-- surface_type="none" membuat videonya transparan, hanya kontrol yang terlihat -->
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/playerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:use_controller="true"
+            app:show_buffering="never"
+            app:surface_type="none" />
+
+    </FrameLayout>
+
+    <!-- Tombol Pilih Video -->
     <Button
         android:id="@+id/btnPickVideo"
         android:layout_width="wrap_content"
@@ -25,7 +40,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- DERETAN MENU SCROLL (Eksposur, Kontras, dll) -->
+    <!-- Deretan Menu Scroll (Eksposur, Kontras, dll) -->
     <HorizontalScrollView
         android:id="@+id/menuScrollView"
         android:layout_width="match_parent"
@@ -55,7 +70,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- Slider -->
+    <!-- Slider Editor -->
     <SeekBar
         android:id="@+id/seekBarContrast"
         android:layout_width="match_parent"
