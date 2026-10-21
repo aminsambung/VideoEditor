@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private var glSurfaceView: GLSurfaceView? = null
     private val handler = Handler(Looper.getMainLooper())
     
+    // Launcher untuk memilih video dari galeri
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val videoUri: Uri? = result.data?.data
@@ -38,11 +39,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Daftar Menu untuk Panel Adjust
     private val adjustTools = listOf(
         "Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", 
         "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
     )
 
+    // Daftar Menu untuk Panel Filters
     private val filterList = listOf(
         "Normal", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
     )
@@ -51,14 +54,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Setup Video Player (Sama seperti sebelumnya)
+        // 1. Setup OpenGL & Video Renderer
         glSurfaceView = findViewById(R.id.glSurfaceView)
         glSurfaceView?.setEGLContextClientVersion(2)
+        
         videoRenderer = VideoRenderer(this)
         glSurfaceView?.setRenderer(videoRenderer)
         glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
+        // 2. Inisialisasi ExoPlayer
         exoPlayer = ExoPlayer.Builder(this).build()
+
+        // 3. Setup Kontrol Player (Auto-Hide)
         val playerView = findViewById<PlayerView>(R.id.playerView)
         playerView.player = exoPlayer
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
@@ -71,27 +78,30 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 2. Tombol Pilih Video
+        // 4. Tombol Pilih Video
         findViewById<Button>(R.id.btnPickVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
             pickVideoLauncher.launch(intent)
         }
 
-        // 3. Tombol Buka Panel Adjust
+        // 5. Tombol Navigasi Bawah: Buka Panel Adjust
         findViewById<Button>(R.id.btnAdjust).setOnClickListener {
             showAdjustDialog()
         }
 
-        // 4. Tombol Buka Panel Filters
+        // 6. Tombol Navigasi Bawah: Buka Panel Filters
         findViewById<Button>(R.id.btnFilters).setOnClickListener {
             showFiltersDialog()
         }
     }
 
-    // === FUNGSI MEMUNCULKAN PANEL ADJUST ===
+    // ==========================================
+    // FUNGSI MEMUNCULKAN PANEL ADJUST
+    // ==========================================
     private fun showAdjustDialog() {
-        val dialog = BottomSheetDialog(this, R.style.Theme_VideoEditor)
+        // Menggunakan tema BottomSheet yang sudah diperbaiki
+        val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_adjust, null)
         dialog.setContentView(view)
 
@@ -134,8 +144,10 @@ class MainActivity : AppCompatActivity() {
                 val value = (progress - 50).toFloat()
                 tvCurrentTool.text = "$currentTool: ${value.toInt()}"
                 
-                // TODO: Hubungkan ke videoRenderer nanti
-                // when (currentTool) { "Kontras" -> videoRenderer?.setContrast(value) }
+                // TODO: Nanti kita sambungkan ke VideoRenderer untuk efek video
+                // when (currentTool) {
+                //     "Kontras" -> videoRenderer?.setContrast(value)
+                // }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -144,9 +156,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    // === FUNGSI MEMUNCULKAN PANEL FILTERS ===
+    // ==========================================
+    // FUNGSI MEMUNCULKAN PANEL FILTERS
+    // ==========================================
     private fun showFiltersDialog() {
-        val dialog = BottomSheetDialog(this, R.style.Theme_VideoEditor)
+        val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null)
         dialog.setContentView(view)
 
@@ -158,8 +172,15 @@ class MainActivity : AppCompatActivity() {
             textView.setTextColor(Color.WHITE)
             textView.textSize = 14f
             textView.setPadding(32, 16, 32, 16)
-            // Beri background kotak kecil sebagai indikator
             textView.setBackgroundColor(Color.parseColor("#444444"))
+
+            // Beri margin antar tombol filter
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.marginEnd = 16
+            textView.layoutParams = params
 
             textView.setOnClickListener {
                 // TODO: Terapkan filter ke videoRenderer nanti
@@ -172,11 +193,15 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ==========================================
+    // FUNGSI MEMUTAR VIDEO
+    // ==========================================
     private fun playVideo(uri: Uri) {
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer?.setMediaItem(mediaItem)
         
+        // Listener untuk mendapatkan ukuran video (agar tidak memanjang)
         exoPlayer?.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 super.onVideoSizeChanged(videoSize)
@@ -186,6 +211,8 @@ class MainActivity : AppCompatActivity() {
 
         exoPlayer?.prepare()
         exoPlayer?.play()
+        
+        // Sembunyikan kontrol setelah 3 detik
         handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
     }
 
