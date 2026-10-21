@@ -2,6 +2,8 @@ package com.aminsambung.videoeditor
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
@@ -23,6 +25,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,30 +34,38 @@ class MainActivity : AppCompatActivity() {
     private var glSurfaceView: GLSurfaceView? = null
     private val handler = Handler(Looper.getMainLooper())
     
-    // Launcher untuk memilih video dari galeri
+    // Status apakah sedang mengedit foto atau video
+    private var isEditingPhoto = false 
+
+    // Launcher Pilih Video
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val videoUri: Uri? = result.data?.data
-            if (videoUri != null) playVideo(videoUri)
+            if (videoUri != null) {
+                isEditingPhoto = false
+                playVideo(videoUri)
+            }
         }
     }
 
-    // Daftar Menu untuk Panel Adjust
-    private val adjustTools = listOf(
-        "Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", 
-        "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
-    )
+    // Launcher Pilih Foto
+    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val imageUri: Uri? = result.data?.data
+            if (imageUri != null) {
+                isEditingPhoto = true
+                loadPhoto(imageUri)
+            }
+        }
+    }
 
-    // Daftar Menu untuk Panel Filters (Tambahkan "Glow" di sini)
-    private val filterList = listOf(
-        "Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
-    )
+    private val adjustTools = listOf("Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition")
+    private val filterList = listOf("Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Setup OpenGL & Video Renderer
         glSurfaceView = findViewById(R.id.glSurfaceView)
         glSurfaceView?.setEGLContextClientVersion(2)
         
@@ -62,10 +73,8 @@ class MainActivity : AppCompatActivity() {
         glSurfaceView?.setRenderer(videoRenderer)
         glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
-        // 2. Inisialisasi ExoPlayer
         exoPlayer = ExoPlayer.Builder(this).build()
 
-        // 3. Setup Kontrol Player (Auto-Hide)
         val playerView = findViewById<PlayerView>(R.id.playerView)
         playerView.player = exoPlayer
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
@@ -78,26 +87,51 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 4. Tombol Pilih Video
-        findViewById<Button>(R.id.btnPickVideo).setOnClickListener {
+        // Tombol Navigasi Bawah
+        findViewById<Button>(R.id.btnVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
             pickVideoLauncher.launch(intent)
         }
 
-        // 5. Tombol Navigasi Bawah: Buka Panel Adjust
-        findViewById<Button>(R.id.btnAdjust).setOnClickListener {
-            showAdjustDialog()
+        findViewById<Button>(R.id.btnPhoto).setOnClickListener {
+            val intent = Intent(Intent.ACTION_GET_CONTENT)
+            intent.setType("image/*") // Tipe gambar
+            pickPhotoLauncher.launch(intent)
         }
 
-        // 6. Tombol Navigasi Bawah: Buka Panel Filters
-        findViewById<Button>(R.id.btnFilters).setOnClickListener {
-            showFiltersDialog()
+        findViewById<Button>(R.id.btnAdjust).setOnClickListener { showAdjustDialog() }
+        findViewById<Button>(R.id.btnFilters).setOnClickListener { showFiltersDialog() }
+        
+        // Tombol Crop (Placeholder)
+        findViewById<Button>(R.id.btnCrop).setOnClickListener {
+            // TODO: Implementasi Crop nanti
         }
     }
 
     // ==========================================
-    // FUNGSI MEMUNCULKAN PANEL ADJUST
+    // FUNGSI MEMUAT FOTO KE LAYAR
+    // ==========================================
+    private fun loadPhoto(uri: Uri) {
+        // Hentikan video jika sedang berjalan
+        exoPlayer?.pause()
+        exoPlayer?.clearMediaItems()
+
+        try {
+            // Baca gambar dari galeri
+            val inputStream: InputStream? = contentResolver.openInputStream(uri)
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            
+            // Kirim bitmap ke Renderer untuk dijadikan tekstur
+            videoRenderer?.setImageBitmap(bitmap)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // ==========================================
+    // FUNGSI ADJUST & FILTERS (SAMA SEPERTI SEBELUMNYA)
     // ==========================================
     private fun showAdjustDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
@@ -110,7 +144,6 @@ class MainActivity : AppCompatActivity() {
 
         var currentTool = "Kontras"
 
-        // Generate menu Adjust
         for (tool in adjustTools) {
             val textView = TextView(this)
             textView.text = tool
@@ -139,32 +172,25 @@ class MainActivity : AppCompatActivity() {
             menuContainer.addView(textView)
         }
 
-        // Logika Slider Adjust
         seekBarAdjust.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val value = (progress - 50).toFloat() // Range -50 sampai 50
+                val value = (progress - 50).toFloat()
                 tvCurrentTool.text = "$currentTool: ${value.toInt()}"
                 
-                // Hubungkan Slider ke VideoRenderer
                 when (currentTool) {
                     "Eksposur" -> videoRenderer?.setExposure(value)
                     "Kontras" -> videoRenderer?.setContrast(value)
                     "Saturation" -> videoRenderer?.setSaturation(value)
                     "Warm" -> videoRenderer?.setWarmth(value)
                     "Tint" -> videoRenderer?.setTint(value)
-                    // Menu lain bisa ditambahkan di sini nanti
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
-
         dialog.show()
     }
 
-    // ==========================================
-    // FUNGSI MEMUNCULKAN PANEL FILTERS
-    // ==========================================
     private fun showFiltersDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null)
@@ -172,7 +198,6 @@ class MainActivity : AppCompatActivity() {
 
         val menuContainer = view.findViewById<LinearLayout>(R.id.menuContainerFilters)
 
-        // Generate menu Filters
         for (filterName in filterList) {
             val textView = TextView(this)
             textView.text = filterName
@@ -189,10 +214,9 @@ class MainActivity : AppCompatActivity() {
             textView.layoutParams = params
 
             textView.setOnClickListener {
-                // Terapkan efek berdasarkan filter yang dipilih
                 when (filterName) {
                     "Normal" -> videoRenderer?.resetFilters()
-                    "Glow" -> videoRenderer?.applyBeautyFilter() // Efek Kulit Cerah
+                    "Glow" -> videoRenderer?.applyBeautyFilter()
                     "Vivid" -> {
                         videoRenderer?.resetFilters()
                         videoRenderer?.setSaturation(30f)
@@ -208,15 +232,13 @@ class MainActivity : AppCompatActivity() {
                     }
                     "Mono" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(-50f) // Hitam Putih
+                        videoRenderer?.setSaturation(-50f)
                     }
-                    // Filter lain bisa ditambahkan di sini
                 }
                 dialog.dismiss()
             }
             menuContainer.addView(textView)
         }
-
         dialog.show()
     }
 
@@ -228,7 +250,6 @@ class MainActivity : AppCompatActivity() {
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer?.setMediaItem(mediaItem)
         
-        // Listener untuk mendapatkan ukuran video (agar tidak memanjang)
         exoPlayer?.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 super.onVideoSizeChanged(videoSize)
@@ -238,7 +259,6 @@ class MainActivity : AppCompatActivity() {
 
         exoPlayer?.prepare()
         exoPlayer?.play()
-        
         handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
     }
 
