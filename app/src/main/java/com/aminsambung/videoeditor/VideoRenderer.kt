@@ -23,7 +23,6 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private lateinit var vertexBuffer: FloatBuffer
     private lateinit var textureBuffer: FloatBuffer
 
-    // Dua program shader: satu untuk video, satu untuk foto
     private var videoProgram = 0
     private var photoProgram = 0
 
@@ -32,25 +31,25 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var screenWidth = 0
     private var screenHeight = 0
 
-    // Filter Variables (Default Normal)
+    // --- Variabel Filter ---
     private var exposure = 0.0f
     private var contrast = 1.0f
     private var saturation = 1.0f
     private var warmth = 0.0f
     private var tint = 0.0f
+    private var brightness = 0.0f
+    private var highlights = 0.0f // Nilai 0 = normal
+    private var shadows = 0.0f    // Nilai 0 = normal
 
-    // Variabel untuk Mode Foto
     private var isPhotoMode = false
     private var photoTextureId = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
 
-        // 1. Buat kedua program shader
         videoProgram = createProgram(isPhoto = false)
         photoProgram = createProgram(isPhoto = true)
 
-        // 2. Setup Buffer
         val textures = floatArrayOf(
             0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f
         )
@@ -59,7 +58,6 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
             .asFloatBuffer()
             .apply { put(textures); position(0) }
 
-        // 3. Buat Tekstur Video (External OES)
         val textureId = IntArray(1)
         GLES20.glGenTextures(1, textureId, 0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId[0])
@@ -87,15 +85,12 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
-    // Fungsi untuk memuat Foto (Bitmap)
     fun setImageBitmap(bitmap: Bitmap) {
         isPhotoMode = true
-        // Hapus tekstur foto lama jika ada
         if (photoTextureId != -1) {
             GLES20.glDeleteTextures(1, intArrayOf(photoTextureId), 0)
         }
 
-        // Buat tekstur baru untuk foto
         val texIds = IntArray(1)
         GLES20.glGenTextures(1, texIds, 0)
         photoTextureId = texIds[0]
@@ -103,11 +98,8 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, photoTextureId)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
-
-        // Masukkan Bitmap ke Tekstur
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
 
-        // Set ukuran agar aspect ratio benar
         setVideoSize(bitmap.width, bitmap.height)
     }
 
@@ -124,7 +116,6 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         var scaleX = 1f
         var scaleY = 1f
 
-        // Logika agar video/foto tidak gepeng (Fit Center)
         if (videoAspect > screenAspect) {
             scaleY = screenAspect / videoAspect
         } else {
@@ -188,33 +179,53 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uSaturation"), saturation)
         GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uWarmth"), warmth)
         GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uTint"), tint)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uBrightness"), brightness)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uHighlights"), highlights)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uShadows"), shadows)
     }
 
-    // --- FUNGSI FILTER ---
-// Diubah pembaginya menjadi 100.0f agar nilai maksimal 100 terasa efeknya
-fun setExposure(value: Float) { exposure = value / 100.0f }
-fun setContrast(value: Float) { contrast = 1.0f + (value / 100.0f) }
-fun setSaturation(value: Float) { saturation = 1.0f + (value / 100.0f) }
-fun setWarmth(value: Float) { warmth = value / 100.0f }
-fun setTint(value: Float) { tint = value / 100.0f }
+    // --- FUNGSI FILTER (Nilai -100 sampai 100) ---
+    fun setExposure(value: Float) { exposure = value / 100.0f }
+    fun setContrast(value: Float) { contrast = 1.0f + (value / 100.0f) }
+    fun setSaturation(value: Float) { saturation = 1.0f + (value / 100.0f) }
+    fun setWarmth(value: Float) { warmth = value / 100.0f }
+    fun setTint(value: Float) { tint = value / 100.0f }
+    
+    fun setBrightness(value: Float) { brightness = value / 100.0f }
+    fun setHighlights(value: Float) { highlights = value / 100.0f }
+    fun setShadows(value: Float) { shadows = value / 100.0f }
 
-fun applyBeautyFilter() {
-    exposure = 0.15f
-    contrast = 0.9f
-    saturation = 0.9f
-    warmth = -0.1f
-    tint = 0.2f
-}
+    // PRESET FILTER VIVID (Mirip Gambar 2)
+    fun applyVividFilter() {
+        resetFilters()
+        saturation = 1.8f   // Warna sangat pekat
+        contrast = 1.3f     // Kontras tinggi
+        exposure = 0.15f    // Sedikit lebih terang
+        brightness = 0.1f   // Sedikit lebih cerah
+        highlights = -0.3f  // Turunkan highlight agar awan tidak pecah
+        shadows = 0.1f      // Naikkan shadow agar area gelap tidak terlalu hitam
+    }
 
-fun resetFilters() {
-    exposure = 0.0f
-    contrast = 1.0f
-    saturation = 1.0f
-    warmth = 0.0f
-    tint = 0.0f
-}
+    fun applyBeautyFilter() {
+        exposure = 0.15f
+        contrast = 0.9f
+        saturation = 0.9f
+        warmth = -0.1f
+        tint = 0.2f
+    }
 
-    // --- PEMBUATAN SHADER ---
+    fun resetFilters() {
+        exposure = 0.0f
+        contrast = 1.0f
+        saturation = 1.0f
+        warmth = 0.0f
+        tint = 0.0f
+        brightness = 0.0f
+        highlights = 0.0f
+        shadows = 0.0f
+    }
+
+    // --- PEMBUATAN SHADER (DENGAN HIGHLIGHT & SHADOW) ---
     private fun createProgram(isPhoto: Boolean): Int {
         val vertexShaderCode = """
             attribute vec4 aPosition;
@@ -226,7 +237,6 @@ fun resetFilters() {
             }
         """.trimIndent()
 
-        // Tipe sampler berbeda untuk Video dan Foto
         val samplerType = if (isPhoto) "sampler2D" else "samplerExternalOES"
         val extension = if (isPhoto) "" else "#extension GL_OES_EGL_image_external : require\n"
 
@@ -241,26 +251,37 @@ fun resetFilters() {
             uniform float uSaturation;
             uniform float uWarmth;
             uniform float uTint;
+            uniform float uBrightness;
+            uniform float uHighlights;
+            uniform float uShadows;
 
             void main() {
                 vec4 color = texture2D(sTexture, vTextureCoord);
                 vec3 rgb = color.rgb;
 
-                // 1. Exposure
-                rgb = rgb + uExposure;
+                // 1. Exposure & Brightness
+                rgb = rgb + uExposure + (uBrightness * 0.5);
 
-                // 2. Contrast
+                // 2. Highlights & Shadows (Kunci efek Vivid)
+                // Hitung luminance (tingkat kecerahan)
+                float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
+                
+                // Terapkan Highlight (mempengaruhi area terang)
+                rgb = rgb + (uHighlights * smoothstep(0.5, 1.0, luma));
+                
+                // Terapkan Shadow (mempengaruhi area gelap)
+                rgb = rgb + (uShadows * (1.0 - smoothstep(0.0, 0.5, luma)));
+
+                // 3. Contrast
                 rgb = (rgb - 0.5) * uContrast + 0.5;
 
-                // 3. Saturation
-                float luminance = dot(rgb, vec3(0.299, 0.587, 0.114));
-                rgb = mix(vec3(luminance), rgb, uSaturation);
+                // 4. Saturation
+                float finalLuma = dot(rgb, vec3(0.299, 0.587, 0.114));
+                rgb = mix(vec3(finalLuma), rgb, uSaturation);
 
-                // 4. Warmth
+                // 5. Warmth & Tint
                 rgb.r = rgb.r + (uWarmth * 0.2);
                 rgb.b = rgb.b - (uWarmth * 0.2);
-
-                // 5. Tint
                 rgb.g = rgb.g - (uTint * 0.2);
 
                 gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), color.a);
