@@ -219,20 +219,20 @@ class MainActivity : AppCompatActivity() {
                     "Glow" -> videoRenderer?.applyBeautyFilter()
                     "Vivid" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(30f)
-                        videoRenderer?.setContrast(20f)
+                        videoRenderer?.setSaturation(50f)
+                        videoRenderer?.setContrast(30f)
                     }
                     "Warm" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setWarmth(30f)
+                        videoRenderer?.setWarmth(50f)
                     }
                     "Cool" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setWarmth(-30f)
+                        videoRenderer?.setWarmth(-50f)
                     }
                     "Mono" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(-50f)
+                        videoRenderer?.setSaturation(-100f)
                     }
                 }
                 dialog.dismiss()
