@@ -59,13 +59,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val adjustTools = listOf("Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition")
-    private val filterList = listOf("Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage")
+    private val adjustTools = listOf(
+        "Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", 
+        "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
+    )
+    
+    private val filterList = listOf(
+        "Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 1. Setup OpenGL & Video Renderer
         glSurfaceView = findViewById(R.id.glSurfaceView)
         glSurfaceView?.setEGLContextClientVersion(2)
         
@@ -73,8 +80,10 @@ class MainActivity : AppCompatActivity() {
         glSurfaceView?.setRenderer(videoRenderer)
         glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
 
+        // 2. Inisialisasi ExoPlayer
         exoPlayer = ExoPlayer.Builder(this).build()
 
+        // 3. Setup Kontrol Player (Auto-Hide)
         val playerView = findViewById<PlayerView>(R.id.playerView)
         playerView.player = exoPlayer
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
@@ -87,7 +96,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // Tombol Navigasi Bawah
+        // 4. Tombol Navigasi Bawah
         findViewById<Button>(R.id.btnVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
@@ -96,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnPhoto).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.setType("image/*") // Tipe gambar
+            intent.setType("image/*")
             pickPhotoLauncher.launch(intent)
         }
 
@@ -113,25 +122,20 @@ class MainActivity : AppCompatActivity() {
     // FUNGSI MEMUAT FOTO KE LAYAR
     // ==========================================
     private fun loadPhoto(uri: Uri) {
-        // Hentikan video jika sedang berjalan
         exoPlayer?.pause()
         exoPlayer?.clearMediaItems()
 
         try {
-            // Baca gambar dari galeri
             val inputStream: InputStream? = contentResolver.openInputStream(uri)
             val bitmap = BitmapFactory.decodeStream(inputStream)
-            
-            // Kirim bitmap ke Renderer untuk dijadikan tekstur
             videoRenderer?.setImageBitmap(bitmap)
-            
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     // ==========================================
-    // FUNGSI ADJUST & FILTERS (SAMA SEPERTI SEBELUMNYA)
+    // FUNGSI PANEL ADJUST
     // ==========================================
     private fun showAdjustDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
@@ -174,7 +178,7 @@ class MainActivity : AppCompatActivity() {
 
         seekBarAdjust.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val value = (progress - 50).toFloat()
+                val value = (progress - 50).toFloat() * 2 // Skala -100 sampai 100
                 tvCurrentTool.text = "$currentTool: ${value.toInt()}"
                 
                 when (currentTool) {
@@ -183,6 +187,9 @@ class MainActivity : AppCompatActivity() {
                     "Saturation" -> videoRenderer?.setSaturation(value)
                     "Warm" -> videoRenderer?.setWarmth(value)
                     "Tint" -> videoRenderer?.setTint(value)
+                    "Brightness" -> videoRenderer?.setBrightness(value)
+                    "Highlight" -> videoRenderer?.setHighlights(value)
+                    "Shadow" -> videoRenderer?.setShadows(value)
                 }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -191,6 +198,9 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ==========================================
+    // FUNGSI PANEL FILTERS
+    // ==========================================
     private fun showFiltersDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null)
@@ -217,12 +227,7 @@ class MainActivity : AppCompatActivity() {
                 when (filterName) {
                     "Normal" -> videoRenderer?.resetFilters()
                     "Glow" -> videoRenderer?.applyBeautyFilter()
-                    "Vivid" -> {
-                        videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(80f)
-                        videoRenderer?.setContrast(30f)
-                        videoRenderer?.setExposure(15f)
-                    }
+                    "Vivid" -> videoRenderer?.applyVividFilter() // Efek Langit Biru Pekat
                     "Warm" -> {
                         videoRenderer?.resetFilters()
                         videoRenderer?.setWarmth(50f)
@@ -247,9 +252,9 @@ class MainActivity : AppCompatActivity() {
     // FUNGSI MEMUTAR VIDEO
     // ==========================================
     private fun playVideo(uri: Uri) {
-            // TAMBAHKAN BARIS INI AGAR KEMBALI KE MODE VIDEO
+        // Pastikan kembali ke mode video (jika sebelumnya sedang mengedit foto)
         videoRenderer?.setVideoMode() 
- 
+        
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer?.setMediaItem(mediaItem)
