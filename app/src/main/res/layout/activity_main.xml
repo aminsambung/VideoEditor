@@ -41,33 +41,65 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- Navigasi Bawah (Video, Adjust, Filters, Crop) -->
-    <LinearLayout
-        android:id="@+id/bottomNavBar"
-        android:layout_width="match_parent"
+   <!-- Navigasi Bawah (Foto, Video, Adjust, Filters, Crop) -->
+<LinearLayout
+    android:id="@+id/bottomNavBar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="#1A1A1A"
+    android:padding="8dp"
+    android:gravity="center"
+    app:layout_constraintBottom_toBottomOf="parent">
+
+    <Button
+        android:id="@+id/btnPhoto"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="#1A1A1A"
-        android:padding="16dp"
-        android:gravity="center"
-        app:layout_constraintBottom_toBottomOf="parent">
+        android:layout_weight="1"
+        android:text="Foto"
+        android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/btnAdjust"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Adjust"
-            android:backgroundTint="#333333" />
+    <Button
+        android:id="@+id/btnVideo"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:text="Video"
+        android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/btnFilters"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Filters"
-            android:backgroundTint="#333333" />
-    </LinearLayout>
+    <Button
+        android:id="@+id/btnAdjust"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:text="Adjust"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/btnFilters"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:text="Filters"
+        android:textSize="12sp" />
+        
+    <Button
+        android:id="@+id/btnCrop"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:text="Crop"
+        android:textSize="12sp" />
+</LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
