@@ -18,34 +18,20 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var videoSurface: Surface? = null
         private set
 
-    // Buffer untuk menggambar persegi (layar)
     private lateinit var vertexBuffer: FloatBuffer
     private lateinit var textureBuffer: FloatBuffer
-
-    // Program shader
     private var program = 0
+
+    // Variabel untuk rasio aspek
+    private var videoWidth = 0
+    private var videoHeight = 0
+    private var screenWidth = 0
+    private var screenHeight = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
 
-        // 1. Buat program OpenGL
         program = createProgram()
-
-        // 2. Siapkan koordinat layar dan tekstur
-        // Koordinat layar (X, Y) untuk persegi panjang
-        val vertices = floatArrayOf(
-            -1.0f, -1.0f,
-             1.0f, -1.0f,
-            -1.0f,  1.0f,
-             1.0f,  1.0f
-        )
-        vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4)
-            .order(ByteOrder.nativeOrder())
-            .asFloatBuffer()
-            .apply {
-                put(vertices)
-                position(0)
-            }
 
         // Koordinat tekstur (U, V) untuk video
         val textures = floatArrayOf(
@@ -62,7 +48,7 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 position(0)
             }
 
-        // 3. Buat tekstur eksternal untuk video (GL_TEXTURE_EXTERNAL_OES)
+        // Buat tekstur eksternal untuk video
         val textureId = IntArray(1)
         GLES20.glGenTextures(1, textureId, 0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId[0])
@@ -71,22 +57,64 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
 
-        // 4. Buat SurfaceTexture dan Surface untuk ExoPlayer
         surfaceTexture = SurfaceTexture(textureId[0])
         videoSurface = Surface(surfaceTexture)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
+        screenWidth = width
+        screenHeight = height
+        updateVertexBuffer() // Hitung ulang saat layar berubah ukuran
+    }
+
+    // Fungsi untuk mengatur ukuran asli video dari ExoPlayer
+    fun setVideoSize(width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            videoWidth = width
+            videoHeight = height
+            updateVertexBuffer()
+        }
+    }
+
+    // Fungsi untuk menghitung skala agar video tidak gepeng
+    private fun updateVertexBuffer() {
+        if (videoWidth == 0 || videoHeight == 0 || screenWidth == 0 || screenHeight == 0) return
+
+        val videoAspect = videoWidth.toFloat() / videoHeight
+        val screenAspect = screenWidth.toFloat() / screenHeight
+
+        var scaleX = 1f
+        var scaleY = 1f
+
+        // Jika rasio video lebih lebar dari layar (misal video landscape di HP portrait)
+        if (videoAspect > screenAspect) {
+            scaleY = screenAspect / videoAspect
+        } else {
+            // Jika rasio video lebih tinggi dari layar (misal video portrait)
+            scaleX = videoAspect / screenAspect
+        }
+
+        val vertices = floatArrayOf(
+            -scaleX, -scaleY,
+             scaleX, -scaleY,
+            -scaleX,  scaleY,
+             scaleX,  scaleY
+        )
+        vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply {
+                put(vertices)
+                position(0)
+            }
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        // Perbarui tekstur dengan frame video terbaru
         surfaceTexture?.updateTexImage()
 
-        // Gunakan program dan gambar persegi
         GLES20.glUseProgram(program)
 
         val positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
@@ -98,14 +126,12 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES20.glEnableVertexAttribArray(textureHandle)
         GLES20.glVertexAttribPointer(textureHandle, 2, GLES20.GL_FLOAT, false, 0, textureBuffer)
 
-        // Gambar
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
 
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(textureHandle)
     }
 
-    // Fungsi untuk membuat program shader
     private fun createProgram(): Int {
         val vertexShaderCode = """
             attribute vec4 aPosition;
