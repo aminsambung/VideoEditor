@@ -191,27 +191,28 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     // --- FUNGSI FILTER ---
-    fun setExposure(value: Float) { exposure = value / 50.0f }
-    fun setContrast(value: Float) { contrast = 1.0f + (value / 50.0f) }
-    fun setSaturation(value: Float) { saturation = 1.0f + (value / 50.0f) }
-    fun setWarmth(value: Float) { warmth = value / 50.0f }
-    fun setTint(value: Float) { tint = value / 50.0f }
+// Diubah pembaginya menjadi 100.0f agar nilai maksimal 100 terasa efeknya
+fun setExposure(value: Float) { exposure = value / 100.0f }
+fun setContrast(value: Float) { contrast = 1.0f + (value / 100.0f) }
+fun setSaturation(value: Float) { saturation = 1.0f + (value / 100.0f) }
+fun setWarmth(value: Float) { warmth = value / 100.0f }
+fun setTint(value: Float) { tint = value / 100.0f }
 
-    fun applyBeautyFilter() {
-        exposure = 0.15f
-        contrast = 0.9f
-        saturation = 0.9f
-        warmth = -0.1f
-        tint = 0.2f
-    }
+fun applyBeautyFilter() {
+    exposure = 0.15f
+    contrast = 0.9f
+    saturation = 0.9f
+    warmth = -0.1f
+    tint = 0.2f
+}
 
-    fun resetFilters() {
-        exposure = 0.0f
-        contrast = 1.0f
-        saturation = 1.0f
-        warmth = 0.0f
-        tint = 0.0f
-    }
+fun resetFilters() {
+    exposure = 0.0f
+    contrast = 1.0f
+    saturation = 1.0f
+    warmth = 0.0f
+    tint = 0.0f
+}
 
     // --- PEMBUATAN SHADER ---
     private fun createProgram(isPhoto: Boolean): Int {
