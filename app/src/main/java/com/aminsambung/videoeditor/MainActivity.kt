@@ -45,9 +45,9 @@ class MainActivity : AppCompatActivity() {
         "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
     )
 
-    // Daftar Menu untuk Panel Filters
+    // Daftar Menu untuk Panel Filters (Tambahkan "Glow" di sini)
     private val filterList = listOf(
-        "Normal", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
+        "Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,7 +100,6 @@ class MainActivity : AppCompatActivity() {
     // FUNGSI MEMUNCULKAN PANEL ADJUST
     // ==========================================
     private fun showAdjustDialog() {
-        // Menggunakan tema BottomSheet yang sudah diperbaiki
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_adjust, null)
         dialog.setContentView(view)
@@ -111,6 +110,7 @@ class MainActivity : AppCompatActivity() {
 
         var currentTool = "Kontras"
 
+        // Generate menu Adjust
         for (tool in adjustTools) {
             val textView = TextView(this)
             textView.text = tool
@@ -139,15 +139,21 @@ class MainActivity : AppCompatActivity() {
             menuContainer.addView(textView)
         }
 
+        // Logika Slider Adjust
         seekBarAdjust.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val value = (progress - 50).toFloat()
+                val value = (progress - 50).toFloat() // Range -50 sampai 50
                 tvCurrentTool.text = "$currentTool: ${value.toInt()}"
                 
-                // TODO: Nanti kita sambungkan ke VideoRenderer untuk efek video
-                // when (currentTool) {
-                //     "Kontras" -> videoRenderer?.setContrast(value)
-                // }
+                // Hubungkan Slider ke VideoRenderer
+                when (currentTool) {
+                    "Eksposur" -> videoRenderer?.setExposure(value)
+                    "Kontras" -> videoRenderer?.setContrast(value)
+                    "Saturation" -> videoRenderer?.setSaturation(value)
+                    "Warm" -> videoRenderer?.setWarmth(value)
+                    "Tint" -> videoRenderer?.setTint(value)
+                    // Menu lain bisa ditambahkan di sini nanti
+                }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -166,6 +172,7 @@ class MainActivity : AppCompatActivity() {
 
         val menuContainer = view.findViewById<LinearLayout>(R.id.menuContainerFilters)
 
+        // Generate menu Filters
         for (filterName in filterList) {
             val textView = TextView(this)
             textView.text = filterName
@@ -174,7 +181,6 @@ class MainActivity : AppCompatActivity() {
             textView.setPadding(32, 16, 32, 16)
             textView.setBackgroundColor(Color.parseColor("#444444"))
 
-            // Beri margin antar tombol filter
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -183,8 +189,29 @@ class MainActivity : AppCompatActivity() {
             textView.layoutParams = params
 
             textView.setOnClickListener {
-                // TODO: Terapkan filter ke videoRenderer nanti
-                // videoRenderer?.applyFilter(filterName)
+                // Terapkan efek berdasarkan filter yang dipilih
+                when (filterName) {
+                    "Normal" -> videoRenderer?.resetFilters()
+                    "Glow" -> videoRenderer?.applyBeautyFilter() // Efek Kulit Cerah
+                    "Vivid" -> {
+                        videoRenderer?.resetFilters()
+                        videoRenderer?.setSaturation(30f)
+                        videoRenderer?.setContrast(20f)
+                    }
+                    "Warm" -> {
+                        videoRenderer?.resetFilters()
+                        videoRenderer?.setWarmth(30f)
+                    }
+                    "Cool" -> {
+                        videoRenderer?.resetFilters()
+                        videoRenderer?.setWarmth(-30f)
+                    }
+                    "Mono" -> {
+                        videoRenderer?.resetFilters()
+                        videoRenderer?.setSaturation(-50f) // Hitam Putih
+                    }
+                    // Filter lain bisa ditambahkan di sini
+                }
                 dialog.dismiss()
             }
             menuContainer.addView(textView)
@@ -212,7 +239,6 @@ class MainActivity : AppCompatActivity() {
         exoPlayer?.prepare()
         exoPlayer?.play()
         
-        // Sembunyikan kontrol setelah 3 detik
         handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
     }
 
