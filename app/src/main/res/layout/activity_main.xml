@@ -6,19 +6,14 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Area Video Player (Menggunakan FrameLayout agar bisa menumpuk 2 View) -->
+    <!-- Area Video Player -->
     <FrameLayout
         android:id="@+id/videoContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/btnPickVideo">
+        app:layout_constraintBottom_toTopOf="@+id/bottomNavBar">
 
-        <!-- 1. GLSurfaceView (Untuk Merender Video dengan Efek GPU) -->
-        <!-- View ini akan ditambahkan secara otomatis oleh kode Kotlin -->
-        
-        <!-- 2. PlayerView (Untuk Menampilkan Kontrol: Play, Pause, Next, Prev) -->
-        <!-- surface_type="none" membuat videonya transparan, hanya kontrol yang terlihat -->
         <androidx.media3.ui.PlayerView
             android:id="@+id/playerView"
             android:layout_width="match_parent"
@@ -27,60 +22,52 @@
             app:show_buffering="never"
             app:surface_type="none" />
 
+        <android.opengl.GLSurfaceView
+            android:id="@+id/glSurfaceView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="false"
+            android:focusable="false" />
     </FrameLayout>
 
-    <!-- Tombol Pilih Video -->
+    <!-- Tombol Pilih Video (Bisa dihapus nanti jika sudah ada di menu utama) -->
     <Button
         android:id="@+id/btnPickVideo"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Pilih Video"
         android:layout_marginBottom="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/menuScrollView"
+        app:layout_constraintBottom_toTopOf="@+id/bottomNavBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- Deretan Menu Scroll (Eksposur, Kontras, dll) -->
-    <HorizontalScrollView
-        android:id="@+id/menuScrollView"
+    <!-- Navigasi Bawah (Video, Adjust, Filters, Crop) -->
+    <LinearLayout
+        android:id="@+id/bottomNavBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:paddingVertical="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/tvContrastValue">
-        
-        <LinearLayout
-            android:id="@+id/menuContainer"
-            android:layout_width="wrap_content"
+        android:orientation="horizontal"
+        android:background="#1A1A1A"
+        android:padding="16dp"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <Button
+            android:id="@+id/btnAdjust"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="8dp" />
-    </HorizontalScrollView>
+            android:layout_weight="1"
+            android:text="Adjust"
+            android:backgroundTint="#333333" />
 
-    <!-- Teks Nilai Slider -->
-    <TextView
-        android:id="@+id/tvContrastValue"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Kontras: 0"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:layout_marginBottom="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/seekBarContrast"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <!-- Slider Editor -->
-    <SeekBar
-        android:id="@+id/seekBarContrast"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="32dp"
-        android:max="100"
-        android:progress="50"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        <Button
+            android:id="@+id/btnFilters"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Filters"
+            android:backgroundTint="#333333" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
