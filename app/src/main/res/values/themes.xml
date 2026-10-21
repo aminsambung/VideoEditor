@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.VideoEditor" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <!-- ... (biarkan isi yang sudah ada) ... -->
+</style>
+<!-- TAMBAHKAN STYLE INI UNTUK BOTTOM SHEET -->
+<style name="Theme.VideoEditor" parent="Theme.Design.BottomSheetDialog">
+    <item name="android:windowIsFloating">false</item>
+    <item name="android:windowBackground">@android:color/transparent</item>
+</style>
+    <style name="Theme.VideoEditor" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
         <!-- Warna utama aplikasi -->
         <item name="colorPrimary">#FF6200EE</item>
         <item name="colorPrimaryVariant">#FF3700B3</item>
