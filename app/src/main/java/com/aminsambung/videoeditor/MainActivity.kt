@@ -147,15 +147,13 @@ class MainActivity : AppCompatActivity() {
                 val value = (progress - 50).toFloat()
                 tvContrastValue.text = "$currentTool: ${value.toInt()}"
                 
-                when (currentTool) {
-                    "Kontras" -> videoRenderer?.setContrast(value)
-                    "Brightness" -> videoRenderer?.setBrightness(value)
-                    "Saturation" -> videoRenderer?.setSaturation(value)
-                    "Eksposur" -> videoRenderer?.setExposure(value)
-                    "Vibrance" -> videoRenderer?.setVibrance(value)
-                    "Warm" -> videoRenderer?.setWarmth(value)
-                    "Highlight" -> videoRenderer?.setHighlight(value)
-                }
+                // Hapus semua pemanggilan filter untuk sementara
+// until video display works
+when (currentTool) {
+    "Kontras" -> { /* TODO: Implement filter */ }
+    "Brightness" -> { /* TODO: Implement filter */ }
+    "Saturation" -> { /* TODO: Implement filter */ }
+}
                 glSurfaceView?.requestRender()
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
