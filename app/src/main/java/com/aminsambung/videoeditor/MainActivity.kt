@@ -14,12 +14,13 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Button
-import android.widget.FrameLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView // Tambahkan import ini
+import androidx.media3.ui.PlayerView
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,16 +28,9 @@ class MainActivity : AppCompatActivity() {
     private var videoRenderer: VideoRenderer? = null
     private var glSurfaceView: GLSurfaceView? = null
     
-    // FITUR AUTO-HIDE KONTROL (Handler untuk timer)
     private val handler = Handler(Looper.getMainLooper())
-    private val hideControlsRunnable = Runnable {
-        // Kode untuk menyembunyikan kontrol (kita panggil melalui PlayerView nanti)
-        exoPlayer?.let { 
-            // Jika kita menggunakan PlayerView, kita bisa pakai ini:
-            // findViewById<PlayerView>(R.id.playerView).hideController()
-        }
-    }
     
+    // Launcher untuk memilih video dari galeri
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val videoUri: Uri? = result.data?.data
@@ -46,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Daftar Menu Editor
     private val editingTools = listOf(
         "Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", 
         "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
@@ -55,45 +50,33 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val videoContainer = findViewById<FrameLayout>(R.id.videoContainer)
-        glSurfaceView = GLSurfaceView(this)
+        // 1. Inisialisasi OpenGL & Video Renderer
+        glSurfaceView = findViewById<GLSurfaceView>(R.id.glSurfaceView)
         glSurfaceView?.setEGLContextClientVersion(2)
         
         videoRenderer = VideoRenderer(this)
         glSurfaceView?.setRenderer(videoRenderer)
+        // Gunakan CONTINUOUSLY agar video berjalan mulus
         glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-        
-        videoContainer.addView(glSurfaceView)
 
-        // 1. Setup ExoPlayer
+        // 2. Inisialisasi ExoPlayer
         exoPlayer = ExoPlayer.Builder(this).build()
-        
-        // =====================================================================
-        // FITUR AUTO-HIDE KONTROL (MENGGUNAKAN CUSTOM PLAYER VIEW)
-        // Karena kita menggunakan GLSurfaceView (bukan PlayerView), kita harus 
-        // membuat "Controller" ExoPlayer muncul di atas GLSurfaceView.
-        // =====================================================================
-        
-        // Kita gunakan PlayerView bawaan Media3, tapi kita sembunyikan videonya (karena sudah di-render GPU)
+
+        // 3. Setup Kontrol Player (Auto-Hide)
         val playerView = findViewById<PlayerView>(R.id.playerView)
         playerView.player = exoPlayer
-        
-        // Sembunyikan Surface video bawaan PlayerView (biarkan GLSurfaceView yang menampilkan)
         playerView.setShutterBackgroundColor(Color.TRANSPARENT)
+        playerView.controllerShowTimeoutMs = 3000 // Sembunyikan setelah 3 detik
         
-        // Atur agar kontrol otomatis hilang setelah 3 detik
-        playerView.controllerShowTimeoutMs = 3000 
-        
-        // Atur agar saat layar di-tap, kontrol muncul/kembali
+        // Listener saat kontrol muncul/hilang
         playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
             if (visibility == View.VISIBLE) {
-                // Jika kontrol muncul, jalankan timer 3 detik untuk menyembunyikannya lagi
-                handler.removeCallbacks(hideControlsRunnable)
+                handler.removeCallbacksAndMessages(null)
                 handler.postDelayed({ playerView.hideController() }, 3000)
             }
         })
 
-        // Tombol Pilih Video
+        // 4. Tombol Pilih Video
         val btnPickVideo = findViewById<Button>(R.id.btnPickVideo)
         btnPickVideo.setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
@@ -101,7 +84,7 @@ class MainActivity : AppCompatActivity() {
             pickVideoLauncher.launch(intent)
         }
 
-        // Sisa kode UI (Menu & Slider) tetap sama seperti sebelumnya...
+        // 5. Generate Menu UI & Slider Logic
         val menuContainer = findViewById<LinearLayout>(R.id.menuContainer)
         val tvContrastValue = findViewById<TextView>(R.id.tvContrastValue)
         val seekBarContrast = findViewById<SeekBar>(R.id.seekBarContrast)
@@ -114,6 +97,7 @@ class MainActivity : AppCompatActivity() {
             textView.setTextColor(Color.WHITE)
             textView.textSize = 14f
             textView.setPadding(32, 16, 32, 16)
+            
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -135,6 +119,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 textView.setTextColor(Color.parseColor("#00FFFF"))
                 textView.setTypeface(null, Typeface.BOLD)
+                
                 currentTool = tool
                 tvContrastValue.text = "$currentTool: 0"
                 seekBarContrast.progress = 50
@@ -147,41 +132,49 @@ class MainActivity : AppCompatActivity() {
                 val value = (progress - 50).toFloat()
                 tvContrastValue.text = "$currentTool: ${value.toInt()}"
                 
-                // Hapus semua pemanggilan filter untuk sementara
-// until video display works
-when (currentTool) {
-    "Kontras" -> { /* TODO: Implement filter */ }
-    "Brightness" -> { /* TODO: Implement filter */ }
-    "Saturation" -> { /* TODO: Implement filter */ }
-}
-                glSurfaceView?.requestRender()
+                // TODO: Nanti kita akan hubungkan ini ke VideoRenderer
+                // when (currentTool) {
+                //     "Kontras" -> videoRenderer?.setContrast(value)
+                // }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
     }
 
+    // Fungsi untuk memutar video
     private fun playVideo(uri: Uri) {
+        // Hubungkan ExoPlayer ke Surface GPU kita
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
+        
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer?.setMediaItem(mediaItem)
+        
+        // PENTING: Kirim ukuran video ke Renderer agar aspek rasio tidak gepeng
+        exoPlayer?.addListener(object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                super.onVideoSizeChanged(videoSize)
+                videoRenderer?.setVideoSize(videoSize.width, videoSize.height)
+            }
+        })
+
         exoPlayer?.prepare()
         exoPlayer?.play()
         
-        // Sembunyikan kontrol saat video mulai diputar
+        // Sembunyikan kontrol setelah 3 detik
         handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
     }
 
     override fun onStop() {
         super.onStop()
         exoPlayer?.pause()
-        handler.removeCallbacks(hideControlsRunnable) // Hentikan timer saat aplikasi di background
+        handler.removeCallbacksAndMessages(null)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         exoPlayer?.release()
         exoPlayer = null
-        handler.removeCallbacks(hideControlsRunnable)
+        handler.removeCallbacksAndMessages(null)
     }
 }
