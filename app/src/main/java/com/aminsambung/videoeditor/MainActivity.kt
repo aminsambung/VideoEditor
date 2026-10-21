@@ -17,6 +17,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     
     private var isEditingPhoto = false 
 
+    // Launcher Pilih Video
     private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val videoUri: Uri? = result.data?.data
@@ -46,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Launcher Pilih Foto
     private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val imageUri: Uri? = result.data?.data
@@ -69,13 +72,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        glSurfaceView = findViewById(R.id.glSurfaceView)
-        glSurfaceView?.setEGLContextClientVersion(2)
-        
-        videoRenderer = VideoRenderer(this)
-        glSurfaceView?.setRenderer(videoRenderer)
-        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-
+        // 1. Inisialisasi ExoPlayer Dasar (Tanpa OpenGL dulu)
         exoPlayer = ExoPlayer.Builder(this).build()
 
         val playerView = findViewById<PlayerView>(R.id.playerView)
@@ -90,6 +87,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        // 2. Setup Tombol Navigasi Bawah
         findViewById<Button>(R.id.btnVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
@@ -106,6 +104,35 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnFilters).setOnClickListener { showFiltersDialog() }
     }
 
+    // 3. Inisialisasi OpenGL di onResume (SANGAT PENTING UNTUK ANDROID 15)
+    override fun onResume() {
+        super.onResume()
+        if (glSurfaceView == null) {
+            try {
+                glSurfaceView = findViewById(R.id.glSurfaceView)
+                glSurfaceView?.setEGLContextClientVersion(2)
+                
+                videoRenderer = VideoRenderer(this)
+                glSurfaceView?.setRenderer(videoRenderer)
+                glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            } catch (e: Exception) {
+                // Jika GPU HP tidak mendukung, aplikasi tidak akan tertutup, tapi hanya memberi pesan
+                Toast.makeText(this, "OpenGL Error: ${e.message}", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
+            }
+        } else {
+            glSurfaceView?.onResume()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        glSurfaceView?.onPause()
+    }
+
+    // ==========================================
+    // FUNGSI MEMUAT FOTO KE LAYAR
+    // ==========================================
     private fun loadPhoto(uri: Uri) {
         exoPlayer?.pause()
         exoPlayer?.clearMediaItems()
@@ -116,9 +143,13 @@ class MainActivity : AppCompatActivity() {
             videoRenderer?.setImageBitmap(bitmap)
         } catch (e: Exception) {
             e.printStackTrace()
+            Toast.makeText(this, "Gagal memuat foto", Toast.LENGTH_SHORT).show()
         }
     }
 
+    // ==========================================
+    // FUNGSI PANEL ADJUST
+    // ==========================================
     private fun showAdjustDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_adjust, null)
@@ -180,6 +211,9 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ==========================================
+    // FUNGSI PANEL FILTERS
+    // ==========================================
     private fun showFiltersDialog() {
         val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null)
@@ -227,7 +261,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    // ==========================================
+    // FUNGSI MEMUTAR VIDEO
+    // ==========================================
     private fun playVideo(uri: Uri) {
+        // Pastikan mode kembali ke video
         videoRenderer?.setVideoMode() 
         
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
