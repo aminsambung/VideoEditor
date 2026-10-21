@@ -1,286 +1,340 @@
 package com.aminsambung.videoeditor
 
-import android.app.Activity
-import android.content.Intent
+import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.graphics.Typeface
-import android.net.Uri
+import android.graphics.SurfaceTexture
+import android.opengl.GLES11Ext
+import android.opengl.GLES20
 import android.opengl.GLSurfaceView
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.LayoutInflater
-import android.view.View
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.SeekBar
-import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
-import com.google.android.material.bottomsheet.BottomSheetDialog
-import java.io.InputStream
+import android.opengl.GLUtils
+import android.view.Surface
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 
-class MainActivity : AppCompatActivity() {
+class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
-    private var exoPlayer: ExoPlayer? = null
-    private var videoRenderer: VideoRenderer? = null
-    private var glSurfaceView: GLSurfaceView? = null
-    private val handler = Handler(Looper.getMainLooper())
-    
-    // Status apakah sedang mengedit foto atau video
-    private var isEditingPhoto = false 
+    private var surfaceTexture: SurfaceTexture? = null
+    var videoSurface: Surface? = null
+        private set
 
-    // Launcher Pilih Video
-    private val pickVideoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val videoUri: Uri? = result.data?.data
-            if (videoUri != null) {
-                isEditingPhoto = false
-                playVideo(videoUri)
-            }
-        }
-    }
+    private lateinit var vertexBuffer: FloatBuffer
+    private lateinit var textureBuffer: FloatBuffer
 
-    // Launcher Pilih Foto
-    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val imageUri: Uri? = result.data?.data
-            if (imageUri != null) {
-                isEditingPhoto = true
-                loadPhoto(imageUri)
-            }
-        }
-    }
+    // Dua program terpisah untuk menghindari konflik
+    private var videoProgram = 0
+    private var photoProgram = 0
 
-    private val adjustTools = listOf(
-        "Eksposur", "Highlight", "Shadow", "Kontras", "Brightness", 
-        "Blackpoint", "Saturation", "Vibrance", "Warm", "Tint", "Definition"
-    )
-    
-    private val filterList = listOf(
-        "Normal", "Glow", "Vivid", "Retro", "Mono", "Warm", "Cool", "Vintage"
-    )
+    private var videoWidth = 0
+    private var videoHeight = 0
+    private var screenWidth = 0
+    private var screenHeight = 0
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+    // --- Variabel Filter (Skala -100 s/d 100) ---
+    private var exposure = 0.0f
+    private var contrast = 1.0f
+    private var saturation = 1.0f
+    private var warmth = 0.0f
+    private var tint = 0.0f
+    private var highlights = 0.0f
+    private var shadows = 0.0f
 
-        // 1. Setup OpenGL & Video Renderer
-        glSurfaceView = findViewById(R.id.glSurfaceView)
-        glSurfaceView?.setEGLContextClientVersion(2)
-        
-        videoRenderer = VideoRenderer(this)
-        glSurfaceView?.setRenderer(videoRenderer)
-        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+    private var isPhotoMode = false
+    private var photoTextureId = -1
 
-        // 2. Inisialisasi ExoPlayer
-        exoPlayer = ExoPlayer.Builder(this).build()
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
 
-        // 3. Setup Kontrol Player (Auto-Hide)
-        val playerView = findViewById<PlayerView>(R.id.playerView)
-        playerView.player = exoPlayer
-        playerView.setShutterBackgroundColor(Color.TRANSPARENT)
-        playerView.controllerShowTimeoutMs = 3000
-        
-        playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-            if (visibility == View.VISIBLE) {
-                handler.removeCallbacksAndMessages(null)
-                handler.postDelayed({ playerView.hideController() }, 3000)
-            }
-        })
-
-        // 4. Tombol Navigasi Bawah
-        findViewById<Button>(R.id.btnVideo).setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.setType("video/*")
-            pickVideoLauncher.launch(intent)
-        }
-
-        findViewById<Button>(R.id.btnPhoto).setOnClickListener {
-            val intent = Intent(Intent.ACTION_GET_CONTENT)
-            intent.setType("image/*")
-            pickPhotoLauncher.launch(intent)
-        }
-
-        findViewById<Button>(R.id.btnAdjust).setOnClickListener { showAdjustDialog() }
-        findViewById<Button>(R.id.btnFilters).setOnClickListener { showFiltersDialog() }
-        
-        // Tombol Crop (Placeholder)
-        findViewById<Button>(R.id.btnCrop).setOnClickListener {
-            // TODO: Implementasi Crop nanti
-        }
-    }
-
-    // ==========================================
-    // FUNGSI MEMUAT FOTO KE LAYAR
-    // ==========================================
-    private fun loadPhoto(uri: Uri) {
-        exoPlayer?.pause()
-        exoPlayer?.clearMediaItems()
-
+        // 1. Buat Program secara Aman
         try {
-            val inputStream: InputStream? = contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            videoRenderer?.setImageBitmap(bitmap)
+            videoProgram = createProgram(isPhoto = false)
+            photoProgram = createProgram(isPhoto = true)
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // 2. Setup Buffer
+        val textures = floatArrayOf(
+            0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f
+        )
+        textureBuffer = ByteBuffer.allocateDirect(textures.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply { put(textures); position(0) }
+
+        // 3. Buat Tekstur Video (External OES)
+        val textureId = IntArray(1)
+        GLES20.glGenTextures(1, textureId, 0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId[0])
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+        surfaceTexture = SurfaceTexture(textureId[0])
+        videoSurface = Surface(surfaceTexture)
     }
 
-    // ==========================================
-    // FUNGSI PANEL ADJUST
-    // ==========================================
-    private fun showAdjustDialog() {
-        val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_adjust, null)
-        dialog.setContentView(view)
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        GLES20.glViewport(0, 0, width, height)
+        screenWidth = width
+        screenHeight = height
+        updateVertexBuffer()
+    }
 
-        val tvCurrentTool = view.findViewById<TextView>(R.id.tvCurrentTool)
-        val seekBarAdjust = view.findViewById<SeekBar>(R.id.seekBarAdjust)
-        val menuContainer = view.findViewById<LinearLayout>(R.id.menuContainerAdjust)
+    fun setVideoSize(width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            videoWidth = width
+            videoHeight = height
+            updateVertexBuffer()
+        }
+    }
 
-        var currentTool = "Kontras"
+    // Muat foto dengan aman (Scaling mencegah OOM)
+    fun setImageBitmap(bitmap: Bitmap) {
+        isPhotoMode = true
+        if (photoTextureId != -1) {
+            GLES20.glDeleteTextures(1, intArrayOf(photoTextureId), 0)
+        }
 
-        for (tool in adjustTools) {
-            val textView = TextView(this)
-            textView.text = tool
-            textView.setTextColor(Color.WHITE)
-            textView.textSize = 14f
-            textView.setPadding(32, 16, 32, 16)
+        // Kecilkan resolusi foto jika terlalu besar (Maks 1080p)
+        val maxSize = 1080
+        val scale = Math.min(maxSize.toFloat() / bitmap.width, maxSize.toFloat() / bitmap.height)
+        val safeBitmap = if (scale < 1.0f) {
+            Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+        } else {
+            bitmap
+        }
+
+        val texIds = IntArray(1)
+        GLES20.glGenTextures(1, texIds, 0)
+        photoTextureId = texIds[0]
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, photoTextureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, safeBitmap, 0)
+
+        setVideoSize(safeBitmap.width, safeBitmap.height)
+        
+        // Hapus bitmap sementara jika berbeda dari aslinya
+        if (safeBitmap != bitmap) {
+            safeBitmap.recycle()
+        }
+    }
+
+    fun setVideoMode() {
+        isPhotoMode = false
+    }
+
+    private fun updateVertexBuffer() {
+        if (videoWidth == 0 || videoHeight == 0 || screenWidth == 0 || screenHeight == 0) return
+
+        val videoAspect = videoWidth.toFloat() / videoHeight
+        val screenAspect = screenWidth.toFloat() / screenHeight
+
+        var scaleX = 1f
+        var scaleY = 1f
+
+        if (videoAspect > screenAspect) {
+            scaleY = screenAspect / videoAspect
+        } else {
+            scaleX = videoAspect / screenAspect
+        }
+
+        val vertices = floatArrayOf(
+            -scaleX, -scaleY, scaleX, -scaleY,
+            -scaleX,  scaleY, scaleX,  scaleY
+        )
+        vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply { put(vertices); position(0) }
+    }
+
+    override fun onDrawFrame(gl: GL10?) {
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        
+        // Cek apakah program berhasil dimuat
+        if (videoProgram == 0 || photoProgram == 0) return
+
+        if (isPhotoMode) {
+            drawPhoto()
+        } else {
+            drawVideo()
+        }
+    }
+
+    private fun drawVideo() {
+        surfaceTexture?.updateTexImage()
+        GLES20.glUseProgram(videoProgram)
+        setShaderParameters(videoProgram)
+        drawQuad(videoProgram)
+    }
+
+    private fun drawPhoto() {
+        if (photoTextureId == -1) return
+        GLES20.glUseProgram(photoProgram)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, photoTextureId)
+        setShaderParameters(photoProgram)
+        drawQuad(photoProgram)
+    }
+
+    private fun drawQuad(program: Int) {
+        val positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+        val textureHandle = GLES20.glGetAttribLocation(program, "aTextureCoord")
+
+        GLES20.glEnableVertexAttribArray(positionHandle)
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
+
+        GLES20.glEnableVertexAttribArray(textureHandle)
+        GLES20.glVertexAttribPointer(textureHandle, 2, GLES20.GL_FLOAT, false, 0, textureBuffer)
+
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glDisableVertexAttribArray(textureHandle)
+    }
+
+    private fun setShaderParameters(program: Int) {
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uExposure"), exposure)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uContrast"), contrast)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uSaturation"), saturation)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uWarmth"), warmth)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uTint"), tint)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uHighlights"), highlights)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uShadows"), shadows)
+    }
+
+    // --- FUNGSI FILTER ---
+    fun setExposure(value: Float) { exposure = value / 100.0f }
+    fun setContrast(value: Float) { contrast = 1.0f + (value / 100.0f) }
+    fun setSaturation(value: Float) { saturation = 1.0f + (value / 100.0f) }
+    fun setWarmth(value: Float) { warmth = value / 100.0f }
+    fun setTint(value: Float) { tint = value / 100.0f }
+    fun setBrightness(value: Float) { exposure = value / 100.0f } 
+    fun setHighlights(value: Float) { highlights = value / 100.0f }
+    fun setShadows(value: Float) { shadows = value / 100.0f }
+
+    fun applyVividFilter() {
+        resetFilters()
+        saturation = 1.8f
+        contrast = 1.3f
+        exposure = 0.15f
+        highlights = -0.3f
+        shadows = 0.1f
+    }
+
+    fun applyBeautyFilter() {
+        exposure = 0.15f
+        contrast = 0.9f
+        saturation = 0.9f
+        warmth = -0.1f
+        tint = 0.2f
+    }
+
+    fun resetFilters() {
+        exposure = 0.0f
+        contrast = 1.0f
+        saturation = 1.0f
+        warmth = 0.0f
+        tint = 0.0f
+        highlights = 0.0f
+        shadows = 0.0f
+    }
+
+    // --- PEMBUATAN SHADER ---
+    private fun createProgram(isPhoto: Boolean): Int {
+        val vertexShaderCode = """
+            attribute vec4 aPosition;
+            attribute vec2 aTextureCoord;
+            varying vec2 vTextureCoord;
+            void main() {
+                gl_Position = aPosition;
+                vTextureCoord = aTextureCoord;
+            }
+        """.trimIndent()
+
+        // Tipe sampler berbeda untuk Video (OES) dan Foto (2D)
+        val samplerType = if (isPhoto) "sampler2D" else "samplerExternalOES"
+        val extension = if (isPhoto) "" else "#extension GL_OES_EGL_image_external : require\n"
+
+        val fragmentShaderCode = """
+            $extension
+            precision mediump float;
+            varying vec2 vTextureCoord;
+            uniform $samplerType sTexture;
             
-            if (tool == "Kontras") {
-                textView.setTypeface(null, Typeface.BOLD)
-                textView.setTextColor(Color.parseColor("#00FFFF"))
-                tvCurrentTool.text = "$tool: 0"
+            uniform float uExposure;
+            uniform float uContrast;
+            uniform float uSaturation;
+            uniform float uWarmth;
+            uniform float uTint;
+            uniform float uHighlights;
+            uniform float uShadows;
+
+            void main() {
+                vec4 color = texture2D(sTexture, vTextureCoord);
+                vec3 rgb = color.rgb;
+
+                // Exposure
+                rgb = rgb + uExposure;
+
+                // Highlight & Shadow
+                float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
+                rgb = rgb + (uHighlights * smoothstep(0.5, 1.0, luma));
+                rgb = rgb + (uShadows * (1.0 - smoothstep(0.0, 0.5, luma)));
+
+                // Contrast
+                rgb = (rgb - 0.5) * uContrast + 0.5;
+
+                // Saturation
+                float finalLuma = dot(rgb, vec3(0.299, 0.587, 0.114));
+                rgb = mix(vec3(finalLuma), rgb, uSaturation);
+
+                // Warmth & Tint
+                rgb.r = rgb.r + (uWarmth * 0.2);
+                rgb.b = rgb.b - (uWarmth * 0.2);
+                rgb.g = rgb.g - (uTint * 0.2);
+
+                gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), color.a);
             }
+        """.trimIndent()
 
-            textView.setOnClickListener {
-                for (i in 0 until menuContainer.childCount) {
-                    val child = menuContainer.getChildAt(i) as TextView
-                    child.setTextColor(Color.WHITE)
-                    child.setTypeface(null, Typeface.NORMAL)
-                }
-                textView.setTextColor(Color.parseColor("#00FFFF"))
-                textView.setTypeface(null, Typeface.BOLD)
-                currentTool = tool
-                tvCurrentTool.text = "$currentTool: 0"
-                seekBarAdjust.progress = 50
-            }
-            menuContainer.addView(textView)
-        }
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
 
-        seekBarAdjust.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val value = (progress - 50).toFloat() * 2 // Skala -100 sampai 100
-                tvCurrentTool.text = "$currentTool: ${value.toInt()}"
-                
-                when (currentTool) {
-                    "Eksposur" -> videoRenderer?.setExposure(value)
-                    "Kontras" -> videoRenderer?.setContrast(value)
-                    "Saturation" -> videoRenderer?.setSaturation(value)
-                    "Warm" -> videoRenderer?.setWarmth(value)
-                    "Tint" -> videoRenderer?.setTint(value)
-                    "Brightness" -> videoRenderer?.setBrightness(value)
-                    "Highlight" -> videoRenderer?.setHighlights(value)
-                    "Shadow" -> videoRenderer?.setShadows(value)
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-        dialog.show()
-    }
-
-    // ==========================================
-    // FUNGSI PANEL FILTERS
-    // ==========================================
-    private fun showFiltersDialog() {
-        val dialog = BottomSheetDialog(this, R.style.BottomSheetDialogTheme)
-        val view = LayoutInflater.from(this).inflate(R.layout.dialog_filters, null)
-        dialog.setContentView(view)
-
-        val menuContainer = view.findViewById<LinearLayout>(R.id.menuContainerFilters)
-
-        for (filterName in filterList) {
-            val textView = TextView(this)
-            textView.text = filterName
-            textView.setTextColor(Color.WHITE)
-            textView.textSize = 14f
-            textView.setPadding(32, 16, 32, 16)
-            textView.setBackgroundColor(Color.parseColor("#444444"))
-
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            params.marginEnd = 16
-            textView.layoutParams = params
-
-            textView.setOnClickListener {
-                when (filterName) {
-                    "Normal" -> videoRenderer?.resetFilters()
-                    "Glow" -> videoRenderer?.applyBeautyFilter()
-                    "Vivid" -> videoRenderer?.applyVividFilter() // Efek Langit Biru Pekat
-                    "Warm" -> {
-                        videoRenderer?.resetFilters()
-                        videoRenderer?.setWarmth(50f)
-                    }
-                    "Cool" -> {
-                        videoRenderer?.resetFilters()
-                        videoRenderer?.setWarmth(-50f)
-                    }
-                    "Mono" -> {
-                        videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(-100f)
-                    }
-                }
-                dialog.dismiss()
-            }
-            menuContainer.addView(textView)
-        }
-        dialog.show()
-    }
-
-    // ==========================================
-    // FUNGSI MEMUTAR VIDEO
-    // ==========================================
-    private fun playVideo(uri: Uri) {
-        // Pastikan kembali ke mode video (jika sebelumnya sedang mengedit foto)
-        videoRenderer?.setVideoMode() 
+        val program = GLES20.glCreateProgram()
+        GLES20.glAttachShader(program, vertexShader)
+        GLES20.glAttachShader(program, fragmentShader)
+        GLES20.glLinkProgram(program)
         
-        exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
-        val mediaItem = MediaItem.fromUri(uri)
-        exoPlayer?.setMediaItem(mediaItem)
+        // Cek error saat kompilasi
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            GLES20.glDeleteProgram(program)
+            throw RuntimeException("Error linking program")
+        }
         
-        exoPlayer?.addListener(object : Player.Listener {
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                super.onVideoSizeChanged(videoSize)
-                videoRenderer?.setVideoSize(videoSize.width, videoSize.height)
-            }
-        })
-
-        exoPlayer?.prepare()
-        exoPlayer?.play()
-        handler.postDelayed({ findViewById<PlayerView>(R.id.playerView).hideController() }, 3000)
+        return program
     }
 
-    override fun onStop() {
-        super.onStop()
-        exoPlayer?.pause()
-        handler.removeCallbacksAndMessages(null)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        exoPlayer?.release()
-        exoPlayer = null
-        handler.removeCallbacksAndMessages(null)
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        val shader = GLES20.glCreateShader(type)
+        GLES20.glShaderSource(shader, shaderCode)
+        GLES20.glCompileShader(shader)
+        
+        // Cek error saat load shader
+        val compiled = IntArray(1)
+        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0)
+        if (compiled[0] == 0) {
+            GLES20.glDeleteShader(shader)
+            throw RuntimeException("Error compiling shader")
+        }
+        
+        return shader
     }
 }
