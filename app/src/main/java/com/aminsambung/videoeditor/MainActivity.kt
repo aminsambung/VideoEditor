@@ -246,6 +246,9 @@ class MainActivity : AppCompatActivity() {
     // FUNGSI MEMUTAR VIDEO
     // ==========================================
     private fun playVideo(uri: Uri) {
+            // TAMBAHKAN BARIS INI AGAR KEMBALI KE MODE VIDEO
+        videoRenderer?.setVideoMode() 
+ 
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
         val mediaItem = MediaItem.fromUri(uri)
         exoPlayer?.setMediaItem(mediaItem)
