@@ -65,9 +65,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.2.1")
     implementation("androidx.media3:media3-ui:1.2.1")
 
-    // --- GPUImage (Untuk Efek Real-time Kontras/Eksposur) ---
-    implementation("jp.co.cyberagent.android:gpuimage:2.1.0")
-
     // --- FFmpeg (Untuk Render / Export Video) ---
     // MENGGUNAKAN FORK YANG MASIH AKTIF (karena com.arthenica sudah dihapus)
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-min-gpl:6.0.3")
