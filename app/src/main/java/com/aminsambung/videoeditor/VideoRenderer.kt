@@ -1,10 +1,12 @@
 package com.aminsambung.videoeditor
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
+import android.opengl.GLUtils
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -20,24 +22,35 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private lateinit var vertexBuffer: FloatBuffer
     private lateinit var textureBuffer: FloatBuffer
-    private var program = 0
+
+    // Dua program shader: satu untuk video, satu untuk foto
+    private var videoProgram = 0
+    private var photoProgram = 0
 
     private var videoWidth = 0
     private var videoHeight = 0
     private var screenWidth = 0
     private var screenHeight = 0
 
-    // Variabel untuk Filter (Default: Normal)
+    // Filter Variables (Default Normal)
     private var exposure = 0.0f
     private var contrast = 1.0f
     private var saturation = 1.0f
-    private var warmth = 0.0f // Positif = Hangat/Kuning, Negatif = Dingin/Biru
-    private var tint = 0.0f   // Positif = Magenta/Pink (bagus untuk kulit), Negatif = Hijau
+    private var warmth = 0.0f
+    private var tint = 0.0f
+
+    // Variabel untuk Mode Foto
+    private var isPhotoMode = false
+    private var photoTextureId = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
-        program = createProgram()
 
+        // 1. Buat kedua program shader
+        videoProgram = createProgram(isPhoto = false)
+        photoProgram = createProgram(isPhoto = true)
+
+        // 2. Setup Buffer
         val textures = floatArrayOf(
             0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f
         )
@@ -46,6 +59,7 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
             .asFloatBuffer()
             .apply { put(textures); position(0) }
 
+        // 3. Buat Tekstur Video (External OES)
         val textureId = IntArray(1)
         GLES20.glGenTextures(1, textureId, 0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId[0])
@@ -73,6 +87,34 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
+    // Fungsi untuk memuat Foto (Bitmap)
+    fun setImageBitmap(bitmap: Bitmap) {
+        isPhotoMode = true
+        // Hapus tekstur foto lama jika ada
+        if (photoTextureId != -1) {
+            GLES20.glDeleteTextures(1, intArrayOf(photoTextureId), 0)
+        }
+
+        // Buat tekstur baru untuk foto
+        val texIds = IntArray(1)
+        GLES20.glGenTextures(1, texIds, 0)
+        photoTextureId = texIds[0]
+
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, photoTextureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+
+        // Masukkan Bitmap ke Tekstur
+        GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+
+        // Set ukuran agar aspect ratio benar
+        setVideoSize(bitmap.width, bitmap.height)
+    }
+
+    fun setVideoMode() {
+        isPhotoMode = false
+    }
+
     private fun updateVertexBuffer() {
         if (videoWidth == 0 || videoHeight == 0 || screenWidth == 0 || screenHeight == 0) return
 
@@ -82,6 +124,7 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         var scaleX = 1f
         var scaleY = 1f
 
+        // Logika agar video/foto tidak gepeng (Fit Center)
         if (videoAspect > screenAspect) {
             scaleY = screenAspect / videoAspect
         } else {
@@ -100,23 +143,30 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+        if (isPhotoMode) {
+            drawPhoto()
+        } else {
+            drawVideo()
+        }
+    }
+
+    private fun drawVideo() {
         surfaceTexture?.updateTexImage()
+        GLES20.glUseProgram(videoProgram)
+        setShaderParameters(videoProgram)
+        drawQuad(videoProgram)
+    }
 
-        GLES20.glUseProgram(program)
+    private fun drawPhoto() {
+        if (photoTextureId == -1) return
+        GLES20.glUseProgram(photoProgram)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, photoTextureId)
+        setShaderParameters(photoProgram)
+        drawQuad(photoProgram)
+    }
 
-        // Kirim nilai filter ke GPU (Fragment Shader)
-        val exposureHandle = GLES20.glGetUniformLocation(program, "uExposure")
-        val contrastHandle = GLES20.glGetUniformLocation(program, "uContrast")
-        val saturationHandle = GLES20.glGetUniformLocation(program, "uSaturation")
-        val warmthHandle = GLES20.glGetUniformLocation(program, "uWarmth")
-        val tintHandle = GLES20.glGetUniformLocation(program, "uTint")
-
-        GLES20.glUniform1f(exposureHandle, exposure)
-        GLES20.glUniform1f(contrastHandle, contrast)
-        GLES20.glUniform1f(saturationHandle, saturation)
-        GLES20.glUniform1f(warmthHandle, warmth)
-        GLES20.glUniform1f(tintHandle, tint)
-
+    private fun drawQuad(program: Int) {
         val positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
         val textureHandle = GLES20.glGetAttribLocation(program, "aTextureCoord")
 
@@ -132,40 +182,29 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(textureHandle)
     }
 
-    // --- FUNGSI UNTUK MENGUBAH FILTER ---
-    fun setExposure(value: Float) {
-        // Slider -50 s/d 50 diubah jadi -1.0 s/d 1.0
-        exposure = value / 50.0f
-    }
-    
-    fun setContrast(value: Float) {
-        contrast = 1.0f + (value / 50.0f)
+    private fun setShaderParameters(program: Int) {
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uExposure"), exposure)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uContrast"), contrast)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uSaturation"), saturation)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uWarmth"), warmth)
+        GLES20.glUniform1f(GLES20.glGetUniformLocation(program, "uTint"), tint)
     }
 
-    fun setSaturation(value: Float) {
-        saturation = 1.0f + (value / 50.0f)
-    }
+    // --- FUNGSI FILTER ---
+    fun setExposure(value: Float) { exposure = value / 50.0f }
+    fun setContrast(value: Float) { contrast = 1.0f + (value / 50.0f) }
+    fun setSaturation(value: Float) { saturation = 1.0f + (value / 50.0f) }
+    fun setWarmth(value: Float) { warmth = value / 50.0f }
+    fun setTint(value: Float) { tint = value / 50.0f }
 
-    fun setWarmth(value: Float) {
-        // Positif = Hangat, Negatif = Dingin
-        warmth = value / 50.0f
-    }
-
-    fun setTint(value: Float) {
-        // Positif = Pink/Magenta (mencerahkan kulit), Negatif = Hijau
-        tint = value / 50.0f
-    }
-
-    // Fungsi Preset: Filter "Glow" untuk Kulit Cerah (Mirip Gambar 2 & 3)
     fun applyBeautyFilter() {
-        exposure = 0.15f   // Sedikit lebih terang
-        contrast = 0.9f    // Sedikit kurangi kontras agar bayangan tidak terlalu tajam
-        saturation = 0.9f  // Sedikit kurangi saturasi agar warna tidak terlalu "norak"
-        warmth = -0.1f     // Sedikit lebih dingin (mengurangi warna kuning/kusam)
-        tint = 0.2f        // Tambahkan sedikit warna pink/magenta (kunci kulit glowing)
+        exposure = 0.15f
+        contrast = 0.9f
+        saturation = 0.9f
+        warmth = -0.1f
+        tint = 0.2f
     }
-    
-    // Fungsi Reset ke Normal
+
     fun resetFilters() {
         exposure = 0.0f
         contrast = 1.0f
@@ -174,7 +213,8 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
         tint = 0.0f
     }
 
-    private fun createProgram(): Int {
+    // --- PEMBUATAN SHADER ---
+    private fun createProgram(isPhoto: Boolean): Int {
         val vertexShaderCode = """
             attribute vec4 aPosition;
             attribute vec2 aTextureCoord;
@@ -185,12 +225,15 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
         """.trimIndent()
 
-        // --- INI ADALAH BAGIAN PALING PENTING (FRAGMENT SHADER) ---
+        // Tipe sampler berbeda untuk Video dan Foto
+        val samplerType = if (isPhoto) "sampler2D" else "samplerExternalOES"
+        val extension = if (isPhoto) "" else "#extension GL_OES_EGL_image_external : require\n"
+
         val fragmentShaderCode = """
-            #extension GL_OES_EGL_image_external : require
+            $extension
             precision mediump float;
             varying vec2 vTextureCoord;
-            uniform samplerExternalOES sTexture;
+            uniform $samplerType sTexture;
             
             uniform float uExposure;
             uniform float uContrast;
@@ -212,11 +255,11 @@ class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 float luminance = dot(rgb, vec3(0.299, 0.587, 0.114));
                 rgb = mix(vec3(luminance), rgb, uSaturation);
 
-                // 4. Warmth (Geser Red & Blue)
+                // 4. Warmth
                 rgb.r = rgb.r + (uWarmth * 0.2);
                 rgb.b = rgb.b - (uWarmth * 0.2);
 
-                // 5. Tint (Geser Green & Red/Blue untuk Pink/Magenta)
+                // 5. Tint
                 rgb.g = rgb.g - (uTint * 0.2);
 
                 gl_FragColor = vec4(clamp(rgb, 0.0, 1.0), color.a);
