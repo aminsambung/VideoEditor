@@ -23,13 +23,6 @@
             app:show_buffering="never"
             app:surface_type="none" />
 
-        <!-- GLSurfaceView di atas (untuk render video & foto) -->
-        <android.opengl.GLSurfaceView
-            android:id="@+id/glSurfaceView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clickable="false"
-            android:focusable="false" />
     </FrameLayout>
 
     <!-- Navigasi Bawah -->
