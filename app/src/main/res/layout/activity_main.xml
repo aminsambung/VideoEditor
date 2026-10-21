@@ -6,24 +6,32 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Area Video Player (Mengambil sisa ruang di atas NavBar) -->
-    <FrameLayout
-        android:id="@+id/videoContainer"
+    <!-- Area Video Player -->
+<FrameLayout
+    android:id="@+id/videoContainer"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    app:layout_constraintTop_toTopOf="parent"
+    app:layout_constraintBottom_toTopOf="@+id/bottomNavBar">
+
+    <!-- 1. PlayerView diletakkan di bawah (Hanya untuk Kontrol & Suara) -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/bottomNavBar">
+        android:layout_height="match_parent"
+        app:use_controller="true"
+        app:show_buffering="never"
+        app:surface_type="surface_view" />
 
-        <!-- PlayerView di bawah (untuk kontrol) -->
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/playerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:use_controller="true"
-            app:show_buffering="never"
-            app:surface_type="surface_view" />
-
-    </FrameLayout>
+    <!-- 2. GLSurfaceView diletakkan di atas (Untuk Menampilkan Video & Filter) -->
+    <!-- make sure clickable="false" agar tombol play bisa diklik -->
+    <android.opengl.GLSurfaceView
+        android:id="@+id/glSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+</FrameLayout>
 
     <!-- Navigasi Bawah -->
     <LinearLayout
