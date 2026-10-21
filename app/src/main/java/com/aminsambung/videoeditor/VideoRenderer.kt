@@ -2,101 +2,145 @@ package com.aminsambung.videoeditor
 
 import android.content.Context
 import android.graphics.SurfaceTexture
+import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.view.Surface
-import jp.co.cyberagent.android.gpuimage.GPUImage
-import jp.co.cyberagent.android.gpuimage.filter.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-class VideoRenderer(context: Context) : GLSurfaceView.Renderer, SurfaceTexture.OnFrameAvailableListener {
+class VideoRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
-    private val gpuImage = GPUImage(context)
     private var surfaceTexture: SurfaceTexture? = null
     var videoSurface: Surface? = null
         private set
 
-    // --- DAFTAR FILTER ---
-    private val contrastFilter = GPUImageContrastFilter(1.0f)
-    private val brightnessFilter = GPUImageBrightnessFilter(0.0f)
-    private val saturationFilter = GPUImageSaturationFilter(1.0f)
-    
-    private val exposureFilter = GPUImageExposureFilter(0.0f)
-    private val whiteBalanceFilter = GPUImageWhiteBalanceFilter(5000f, 0.0f)
-    private val highlightShadowFilter = GPUImageHighlightShadowFilter(0.0f, 1.0f)
-    
-    // Vibrance tidak ada di GPUImage standar, kita gunakan Saturation sebagai pengganti sementara
-    // agar menu Vibrance bisa berfungsi (efeknya mirip).
-    private val vibranceFilter = GPUImageSaturationFilter(1.0f) 
+    // Buffer untuk menggambar persegi (layar)
+    private lateinit var vertexBuffer: FloatBuffer
+    private lateinit var textureBuffer: FloatBuffer
 
-    init {
-        gpuImage.setFilter(contrastFilter)
-    }
+    // Program shader
+    private var program = 0
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
-        gpuImage.init()
-        
-        val textureId = gpuImage.getTextureId()
-        surfaceTexture = SurfaceTexture(textureId)
-        surfaceTexture?.setOnFrameAvailableListener(this)
+
+        // 1. Buat program OpenGL
+        program = createProgram()
+
+        // 2. Siapkan koordinat layar dan tekstur
+        // Koordinat layar (X, Y) untuk persegi panjang
+        val vertices = floatArrayOf(
+            -1.0f, -1.0f,
+             1.0f, -1.0f,
+            -1.0f,  1.0f,
+             1.0f,  1.0f
+        )
+        vertexBuffer = ByteBuffer.allocateDirect(vertices.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply {
+                put(vertices)
+                position(0)
+            }
+
+        // Koordinat tekstur (U, V) untuk video
+        val textures = floatArrayOf(
+            0.0f, 1.0f, // kiri bawah
+            1.0f, 1.0f, // kanan bawah
+            0.0f, 0.0f, // kiri atas
+            1.0f, 0.0f  // kanan atas
+        )
+        textureBuffer = ByteBuffer.allocateDirect(textures.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply {
+                put(textures)
+                position(0)
+            }
+
+        // 3. Buat tekstur eksternal untuk video (GL_TEXTURE_EXTERNAL_OES)
+        val textureId = IntArray(1)
+        GLES20.glGenTextures(1, textureId, 0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId[0])
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+        // 4. Buat SurfaceTexture dan Surface untuk ExoPlayer
+        surfaceTexture = SurfaceTexture(textureId[0])
         videoSurface = Surface(surfaceTexture)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
-        gpuImage.onOutputSizeChanged(width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
+        // Perbarui tekstur dengan frame video terbaru
         surfaceTexture?.updateTexImage()
-        gpuImage.onDrawFrame(null)
+
+        // Gunakan program dan gambar persegi
+        GLES20.glUseProgram(program)
+
+        val positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+        val textureHandle = GLES20.glGetAttribLocation(program, "aTextureCoord")
+
+        GLES20.glEnableVertexAttribArray(positionHandle)
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer)
+
+        GLES20.glEnableVertexAttribArray(textureHandle)
+        GLES20.glVertexAttribPointer(textureHandle, 2, GLES20.GL_FLOAT, false, 0, textureBuffer)
+
+        // Gambar
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+        GLES20.glDisableVertexAttribArray(positionHandle)
+        GLES20.glDisableVertexAttribArray(textureHandle)
     }
 
-    override fun onFrameAvailable(surfaceTexture: SurfaceTexture?) {}
+    // Fungsi untuk membuat program shader
+    private fun createProgram(): Int {
+        val vertexShaderCode = """
+            attribute vec4 aPosition;
+            attribute vec2 aTextureCoord;
+            varying vec2 vTextureCoord;
+            void main() {
+                gl_Position = aPosition;
+                vTextureCoord = aTextureCoord;
+            }
+        """.trimIndent()
 
-    // ==========================================
-    // FUNGSI UNTUK MENGUBAH NILAI FILTER
-    // ==========================================
-    
-    fun setContrast(value: Float) {
-        contrastFilter.setContrast(1.0f + (value / 50.0f))
-        gpuImage.setFilter(contrastFilter)
+        val fragmentShaderCode = """
+            #extension GL_OES_EGL_image_external : require
+            precision mediump float;
+            varying vec2 vTextureCoord;
+            uniform samplerExternalOES sTexture;
+            void main() {
+                gl_FragColor = texture2D(sTexture, vTextureCoord);
+            }
+        """.trimIndent()
+
+        val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexShaderCode)
+        val fragmentShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentShaderCode)
+
+        val program = GLES20.glCreateProgram()
+        GLES20.glAttachShader(program, vertexShader)
+        GLES20.glAttachShader(program, fragmentShader)
+        GLES20.glLinkProgram(program)
+        return program
     }
 
-    fun setBrightness(value: Float) {
-        brightnessFilter.setBrightness(value / 50.0f)
-        gpuImage.setFilter(brightnessFilter)
-    }
-
-    fun setSaturation(value: Float) {
-        saturationFilter.setSaturation(1.0f + (value / 50.0f))
-        gpuImage.setFilter(saturationFilter)
-    }
-
-    fun setExposure(value: Float) {
-        exposureFilter.setExposure(value / 50.0f)
-        gpuImage.setFilter(exposureFilter)
-    }
-
-    fun setVibrance(value: Float) {
-        // Menggunakan filter Saturation sebagai pengganti Vibrance
-        vibranceFilter.setSaturation(1.0f + (value / 50.0f))
-        gpuImage.setFilter(vibranceFilter)
-    }
-
-    fun setWarmth(value: Float) {
-        // 5000 adalah suhu normal. Nilai negatif membuat video lebih biru (dingin), positif lebih kuning (hangat)
-        val temperature = 5000f + (value * 50f)
-        whiteBalanceFilter.setTemperature(temperature)
-        gpuImage.setFilter(whiteBalanceFilter)
-    }
-
-    fun setHighlight(value: Float) {
-        // Highlight dari 0.0 (gelap) ke 1.0 (normal)
-        highlightShadowFilter.setHighlights(1.0f - (value / 100.0f))
-        gpuImage.setFilter(highlightShadowFilter)
+    private fun loadShader(type: Int, shaderCode: String): Int {
+        val shader = GLES20.glCreateShader(type)
+        GLES20.glShaderSource(shader, shaderCode)
+        GLES20.glCompileShader(shader)
+        return shader
     }
 }
