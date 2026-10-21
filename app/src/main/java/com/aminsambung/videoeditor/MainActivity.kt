@@ -219,8 +219,9 @@ class MainActivity : AppCompatActivity() {
                     "Glow" -> videoRenderer?.applyBeautyFilter()
                     "Vivid" -> {
                         videoRenderer?.resetFilters()
-                        videoRenderer?.setSaturation(50f)
+                        videoRenderer?.setSaturation(80f)
                         videoRenderer?.setContrast(30f)
+                        videoRenderer?.setExposure(15f)
                     }
                     "Warm" -> {
                         videoRenderer?.resetFilters()
