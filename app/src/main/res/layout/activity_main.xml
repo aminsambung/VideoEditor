@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- Area Video Player -->
+    <!-- Area Video Player (Mengambil sisa ruang di atas NavBar) -->
     <FrameLayout
         android:id="@+id/videoContainer"
         android:layout_width="match_parent"
@@ -14,6 +14,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@+id/bottomNavBar">
 
+        <!-- PlayerView di bawah (untuk kontrol) -->
         <androidx.media3.ui.PlayerView
             android:id="@+id/playerView"
             android:layout_width="match_parent"
@@ -22,6 +23,7 @@
             app:show_buffering="never"
             app:surface_type="none" />
 
+        <!-- GLSurfaceView di atas (untuk render video & foto) -->
         <android.opengl.GLSurfaceView
             android:id="@+id/glSurfaceView"
             android:layout_width="match_parent"
@@ -30,76 +32,75 @@
             android:focusable="false" />
     </FrameLayout>
 
-    <!-- Tombol Pilih Video (Bisa dihapus nanti jika sudah ada di menu utama) -->
-    <Button
-        android:id="@+id/btnPickVideo"
-        android:layout_width="wrap_content"
+    <!-- Navigasi Bawah -->
+    <LinearLayout
+        android:id="@+id/bottomNavBar"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Pilih Video"
-        android:layout_marginBottom="16dp"
-        app:layout_constraintBottom_toTopOf="@+id/bottomNavBar"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        android:orientation="horizontal"
+        android:background="#1A1A1A"
+        android:padding="8dp"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-   <!-- Navigasi Bawah (Foto, Video, Adjust, Filters, Crop) -->
-<LinearLayout
-    android:id="@+id/bottomNavBar"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:background="#1A1A1A"
-    android:padding="8dp"
-    android:gravity="center"
-    app:layout_constraintBottom_toBottomOf="parent">
+        <Button
+            android:id="@+id/btnPhoto"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Foto"
+            android:textSize="10sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
 
-    <Button
-        android:id="@+id/btnPhoto"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Foto"
-        android:textSize="12sp" />
+        <Button
+            android:id="@+id/btnVideo"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Video"
+            android:textSize="10sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
 
-    <Button
-        android:id="@+id/btnVideo"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="4dp"
-        android:text="Video"
-        android:textSize="12sp" />
+        <Button
+            android:id="@+id/btnAdjust"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Adjust"
+            android:textSize="10sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
 
-    <Button
-        android:id="@+id/btnAdjust"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="4dp"
-        android:text="Adjust"
-        android:textSize="12sp" />
-
-    <Button
-        android:id="@+id/btnFilters"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="4dp"
-        android:text="Filters"
-        android:textSize="12sp" />
-        
-    <Button
-        android:id="@+id/btnCrop"
-        style="?attr/materialButtonOutlinedStyle"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginStart="4dp"
-        android:text="Crop"
-        android:textSize="12sp" />
-</LinearLayout>
+        <Button
+            android:id="@+id/btnFilters"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Filters"
+            android:textSize="10sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
+            
+        <Button
+            android:id="@+id/btnCrop"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="Crop"
+            android:textSize="10sp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp" />
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
