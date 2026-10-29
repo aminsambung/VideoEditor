@@ -63,17 +63,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Inisialisasi OpenGL
-        glSurfaceView = findViewById(R.id.glSurfaceView)
-        glSurfaceView?.setEGLContextClientVersion(2)
-        videoRenderer = VideoRenderer(this)
-        glSurfaceView?.setRenderer(videoRenderer)
-        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-
-        // 2. Inisialisasi ExoPlayer (TANPA PlayerView)
+        // 1. Inisialisasi ExoPlayer
         exoPlayer = ExoPlayer.Builder(this).build()
         
-        // 3. Tombol Play/Pause Manual
+        // 2. Tombol Play/Pause Manual
         btnPlayPause = findViewById(R.id.btnPlayPause)
         btnPlayPause?.setOnClickListener {
             if (exoPlayer?.isPlaying == true) {
@@ -95,7 +88,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        // 4. Setup Tombol Navigasi Bawah
+        // 3. Setup Tombol Navigasi Bawah
         findViewById<Button>(R.id.btnVideo).setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("video/*")
@@ -110,6 +103,30 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnAdjust).setOnClickListener { showAdjustDialog() }
         findViewById<Button>(R.id.btnFilters).setOnClickListener { showFiltersDialog() }
+    }
+
+    // 4. Inisialisasi OpenGL di onResume (Anti-Crash untuk Android 15)
+    override fun onResume() {
+        super.onResume()
+        if (glSurfaceView == null) {
+            try {
+                glSurfaceView = findViewById(R.id.glSurfaceView)
+                glSurfaceView?.setEGLContextClientVersion(2)
+                videoRenderer = VideoRenderer(this)
+                glSurfaceView?.setRenderer(videoRenderer)
+                glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            } catch (e: Exception) {
+                Toast.makeText(this, "OpenGL Error: ${e.message}", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
+            }
+        } else {
+            glSurfaceView?.onResume()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        glSurfaceView?.onPause()
     }
 
     private fun loadPhoto(uri: Uri) {
@@ -234,9 +251,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playVideo(uri: Uri) {
-        // KUNCI UTAMA ANDROID 15:
-        // Jangan gunakan PlayerView. Kirim sinyal video langsung ke Renderer.
         videoRenderer?.setVideoMode() 
+        
+        // KUNCI UTAMA ANDROID 15: Kirim sinyal video langsung ke Renderer.
         exoPlayer?.setVideoSurface(videoRenderer?.videoSurface)
         
         val mediaItem = MediaItem.fromUri(uri)
